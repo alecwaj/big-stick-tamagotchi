@@ -10,15 +10,18 @@ interface CareScreenProps {
   onOpenGames: () => void;
   onOpenFriends: () => void;
   onHeal: () => void;
+  onHatch: () => void;
 }
 
 const STAGE_LABEL: Record<WormState['stage'], string> = {
-  baby: 'BABY',
+  egg:   'EGG',
+  baby:  'BABY',
   adult: 'ADULT',
   elder: 'ELDER',
 };
 
 const STAGE_COLOR: Record<WormState['stage'], string> = {
+  egg:   '#ff6699',
   baby:  '#00f5ff',
   adult: '#aaff00',
   elder: '#fbbf24',
@@ -76,10 +79,47 @@ function XpBar({ xp, stage }: { xp: number; stage: WormState['stage'] }) {
   );
 }
 
-export function CareScreen({ worm, onFeed, onCuddle, onOpenGames, onOpenFriends, onHeal }: CareScreenProps) {
-  const color    = COLOR_MAP[worm.color];
-  const glow     = GLOW_MAP[worm.color];
-  const expr     = deriveExpression(worm);
+export function CareScreen({ worm, onFeed, onCuddle, onOpenGames, onOpenFriends, onHeal, onHatch }: CareScreenProps) {
+  const color = COLOR_MAP[worm.color];
+  const glow  = GLOW_MAP[worm.color];
+  const expr  = deriveExpression(worm);
+
+  // ── Egg screen — tap to hatch ─────────────────────────────────────────
+  if (worm.stage === 'egg') {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column', height: '100dvh', alignItems: 'center',
+        justifyContent: 'center', gap: 24,
+        background: 'linear-gradient(160deg, #06000f 0%, #0a0020 50%, #060010 100%)',
+        color: '#e0e0ff',
+      }}>
+        <p style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 9, color, textShadow: `0 0 10px ${glow}`, margin: 0 }}>
+          {worm.name}
+        </p>
+        <p style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 6, color: 'rgba(150,150,200,0.5)', margin: 0 }}>
+          tap the egg to hatch
+        </p>
+        <button
+          onClick={onHatch}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+          aria-label="Hatch your worm"
+        >
+          <WormSVG
+            color={worm.color}
+            hat="none"
+            shades="none"
+            stage="egg"
+            genome={worm.genome ?? ''}
+            animated
+            size={220}
+          />
+        </button>
+        <p style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 6, color: 'rgba(150,150,200,0.35)', margin: 0 }}>
+          ✨ something is waiting inside
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div style={{
@@ -182,6 +222,8 @@ export function CareScreen({ worm, onFeed, onCuddle, onOpenGames, onOpenFriends,
             color={worm.color}
             hat={worm.hat}
             shades={worm.shades}
+            stage={worm.stage}
+            genome={worm.genome ?? ''}
             expression={expr}
             size={200}
           />

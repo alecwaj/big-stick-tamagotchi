@@ -1,6 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { QRCodeSVG as QRCode } from 'qrcode.react';
-import { v4 as uuidv4 } from 'uuid';
 import { WormSVG } from './WormSVG';
 import {
   COLOR_MAP,
@@ -12,6 +11,16 @@ import {
   type WormConfig,
   type CreatedWorm,
 } from '../types';
+
+// ── Genome generator (browser crypto) ────────────────────────────────────
+function generateGenome(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+// ── API base ──────────────────────────────────────────────────────────────
+const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
 
 // ── Option data ───────────────────────────────────────────────────
 
@@ -56,12 +65,28 @@ const TRAITS: { value: WormTrait; label: string; emoji: string }[] = [
 // ── Helpers ───────────────────────────────────────────────────────
 
 function buildCareUrl(token: string): string {
-  return `https://worm.app/care?token=${token}`;
+  return `${API_BASE.replace(':3001', ':5174')}/care?token=${token}`;
 }
 
 async function createWorm(config: WormConfig): Promise<CreatedWorm> {
-  // Stub: in production → POST /api/worms → Supabase
-  return { id: uuidv4(), ownerToken: uuidv4(), config };
+  const resp = await fetch(`${API_BASE}/api/worms`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name:   config.name,
+      color:  config.color,
+      hat:    config.hat,
+      shades: config.shades,
+      trait:  config.trait,
+      genome: config.genome,
+    }),
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error ?? 'Failed to create worm');
+  }
+  const data = await resp.json() as { id: string; ownerToken: string; careUrl: string };
+  return { id: data.id, ownerToken: data.ownerToken, config };
 }
 
 // ── Design tokens ─────────────────────────────────────────────────
@@ -165,8 +190,15 @@ function PillPicker<T extends string>({
 function SuccessScreen({ worm, onReset }: { worm: CreatedWorm; onReset: () => void }) {
   const careUrl = buildCareUrl(worm.ownerToken);
   const [copied, setCopied] = useState(false);
-  const wormGlow = GLOW_MAP[worm.config.color];
+  const [showEggCracks, setShowEggCracks] = useState(false);
+  const wormGlow  = GLOW_MAP[worm.config.color];
   const wormColor = COLOR_MAP[worm.config.color];
+
+  // After 2.5s show cracks on egg — teasing what's inside
+  useEffect(() => {
+    const t = setTimeout(() => setShowEggCracks(true), 2500);
+    return () => clearTimeout(t);
+  }, []);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(careUrl);
@@ -180,20 +212,34 @@ function SuccessScreen({ worm, onReset }: { worm: CreatedWorm; onReset: () => vo
         className="pixel"
         style={{
           fontSize: 13,
-          margin: '0 0 8px 0',
+          margin: '0 0 4px 0',
           color: wormColor,
           textShadow: `0 0 12px ${wormGlow}, 0 0 30px ${wormGlow}`,
           lineHeight: 1.6,
         }}
       >
-        {worm.config.name} has hatched!
+        {worm.config.name} is incubating!
       </h2>
-      <p style={{ color: MUTED, margin: '0 0 40px 0', fontSize: 13 }}>
-        Scan the QR code on your phone to start caring.
+      <p style={{ color: MUTED, margin: '0 0 32px 0', fontSize: 12 }}>
+        Scan the QR code on your phone — your worm will hatch when you tap it.
       </p>
 
       <div style={{ display: 'flex', gap: 56, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
-        <WormSVG color={worm.config.color} hat={worm.config.hat} shades={worm.config.shades} size={180} />
+        {/* Egg preview — shows the mystery egg, not the worm yet */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+          <WormSVG
+            color={worm.config.color}
+            hat="none"
+            shades="none"
+            stage="egg"
+            genome={worm.config.genome}
+            hatched={showEggCracks}
+            size={180}
+          />
+          <p className="pixel" style={{ fontSize: 7, color: MUTED, margin: 0 }}>
+            {showEggCracks ? 'something stirs...' : 'something is inside...'}
+          </p>
+        </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
           <div className="qr-frame">
@@ -253,6 +299,7 @@ const DEFAULT_CONFIG: WormConfig = {
   hat: 'none',
   shades: 'none',
   trait: 'chill',
+  genome: '',
 };
 
 export function CreatorStudio() {
@@ -272,9 +319,16 @@ export function CreatorStudio() {
       return;
     }
     setLoading(true);
-    const worm = await createWorm({ ...config, name: config.name.trim() });
-    setCreated(worm);
-    setLoading(false);
+    try {
+      const genome = generateGenome();
+      const worm = await createWorm({ ...config, name: config.name.trim(), genome });
+      setCreated(worm);
+    } catch (err) {
+      console.error(err);
+      setNameError('server error — is the API running?');
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (created) {

@@ -18,9 +18,11 @@ export type WormHat =
   | 'snapback'
   | 'tophat';
 
-export type WormShades = 'none' | 'round' | 'star' | 'heart' | 'visor';
+export type WormShades = 'none' | 'round' | 'star' | 'heart' | 'visor' | 'sunglasses2';
 
 export type WormTrait = 'sleepy' | 'hyper' | 'grumpy' | 'chill' | 'bubbly' | 'spooky';
+
+export type WormStage = 'egg' | 'baby' | 'adult' | 'elder';
 
 export interface WormConfig {
   name: string;
@@ -28,6 +30,7 @@ export interface WormConfig {
   hat: WormHat;
   shades: WormShades;
   trait: WormTrait;
+  genome: string;       // 32-char hex — generated client-side on hatch
 }
 
 export interface CreatedWorm {

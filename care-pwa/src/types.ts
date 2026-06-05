@@ -18,7 +18,7 @@ export type WormHat =
   | 'tophat';
 export type WormShades  = 'none' | 'round' | 'star' | 'heart' | 'visor' | 'sunglasses2';
 export type WormTrait   = 'sleepy' | 'hyper' | 'grumpy' | 'chill' | 'bubbly' | 'spooky';
-export type WormStage   = 'baby' | 'adult' | 'elder';
+export type WormStage   = 'egg' | 'baby' | 'adult' | 'elder';
 export type WormExpression = 'happy' | 'neutral' | 'sad' | 'sick';
 
 // Each worm friend entry — retained for future benefits
@@ -40,6 +40,8 @@ export interface WormState {
   shades: WormShades;
   trait: WormTrait;
   stage: WormStage;
+  genome: string;         // 32-char hex — drives visual evolution
+  hatched: boolean;       // false = still in egg, true = hatched
   mood: number;          // 0–100
   hunger: number;        // 0–100
   isSick: boolean;

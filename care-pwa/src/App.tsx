@@ -24,8 +24,24 @@ function getToken(): string | null {
 
 export default function App() {
   const token = useMemo(() => getToken(), []);
-  const { worm, feed, cuddle, completeGame, heal, addFriend } = useWorm(token);
+  const { worm, loading, hatch, feed, cuddle, completeGame, heal, addFriend } = useWorm(token);
   const [screen, setScreen] = useState<Screen>('care');
+
+  // Loading state — show spinner while fetching from API
+  if (loading && !worm) {
+    return (
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        height: '100dvh',
+        background: 'linear-gradient(160deg, #06000f 0%, #0a0020 50%, #060010 100%)',
+        color: 'rgba(0,245,255,0.6)',
+        fontFamily: "'Press Start 2P', monospace",
+        fontSize: 8,
+      }}>
+        loading...
+      </div>
+    );
+  }
 
   if (!token || !worm) return <WelcomeScreen />;
 
@@ -45,6 +61,7 @@ export default function App() {
         onOpenGames={() => setScreen('game-menu')}
         onOpenFriends={() => setScreen('friends')}
         onHeal={heal}
+        onHatch={hatch}
       />
 
       {screen === 'game-menu' && (

@@ -4,3 +4,11 @@ dist/
 *.local
 .env
 .env.*
+api/node_modules/
+api/dist/
+api/worms.db
+*.db
+api/worms.db-shm
+api/worms.db-wal
+care-pwa/.env
+creator-studio/.env
