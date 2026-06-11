@@ -282,7 +282,6 @@ function Eyes({ eyeStyle, pupilStyle, cx, cy, bodyColor, animated }: {
   eyeStyle: EyeStyle; pupilStyle: PupilStyle;
   cx: number; cy: number; bodyColor: string; animated: boolean;
 }) {
-  const eyeAnim = animated ? 'animation: blink 3s ease-in-out infinite;' : '';
 
   const pupil = (ex: number, ey: number) => {
     if (pupilStyle === 'cross') return (
@@ -502,7 +501,7 @@ function Tail({ type, cx, baseY, bodyColor }: { type: TailType; cx: number; base
 
 // ── Egg renderer ────────────────────────────────────────────────────────────
 
-function EggRenderer({ bodyColor, glowColor, hatched, animated }: {
+function EggRenderer({ bodyColor, glowColor: _glowColor, hatched, animated }: {
   bodyColor: string; glowColor: string; hatched: boolean; animated: boolean;
 }) {
   const cx = 100;

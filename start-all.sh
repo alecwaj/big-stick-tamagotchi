@@ -20,7 +20,7 @@ STUDIO_PID=$!
 
 # Care PWA
 cd "$ROOT/care-pwa"
-npm install --silent
+npm install --silent --legacy-peer-deps
 npm run dev -- --host &
 PWA_PID=$!
 

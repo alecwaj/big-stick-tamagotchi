@@ -6,7 +6,7 @@ import type { WormFriend, AddFriendResult } from '../types';
 interface FriendsScreenProps {
   myToken: string;
   friends: WormFriend[];
-  onAddFriend: (token: string) => AddFriendResult;
+  onAddFriend: (token: string) => AddFriendResult | Promise<AddFriendResult>;
   onClose: () => void;
 }
 
@@ -241,7 +241,7 @@ export function FriendsScreen({ myToken, friends, onAddFriend, onClose }: Friend
   const [scanError, setScanError]       = useState<string | null>(null);
   const [scanKey, setScanKey]           = useState(0); // remount scanner on retry
 
-  const handleDetected = useCallback((data: string) => {
+  const handleDetected = useCallback(async (data: string) => {
     setScanError(null);
     try {
       // Accept both full URLs and raw UUIDs
@@ -253,7 +253,7 @@ export function FriendsScreen({ myToken, friends, onAddFriend, onClose }: Friend
         if (/^[0-9a-f-]{36}$/i.test(data)) token = data;
       }
       if (!token) { setScanError('Not a worm QR code. Try again.'); return; }
-      const result = onAddFriend(token);
+      const result = await onAddFriend(token);
       if (result === 'invalid') { setScanError('Not a worm QR code. Try again.'); return; }
       setScanResult({ result, token });
     } catch {
