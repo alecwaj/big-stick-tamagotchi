@@ -53,7 +53,7 @@ export function WiggleRace({ onComplete, onExit }: GameProps) {
   // ── End of race → compute result ──
   useEffect(() => {
     if (phase !== 'done') return;
-    wonRef.current = playerPosRef.current > cpuPosRef.current;
+    wonRef.current = playerPosRef.current >= cpuPosRef.current;
     setTimeout(() => setShowResult(true), 400);
   }, [phase]);
 
@@ -63,10 +63,10 @@ export function WiggleRace({ onComplete, onExit }: GameProps) {
     setPlayerPos((prev) => {
       const next = Math.min(100, prev + PLAYER_ADVANCE_PER_TAP);
       playerPosRef.current = next;
-      // Check instant win
-      if (next >= 100 && phase === 'racing') setPhase('done');
       return next;
     });
+    // Check instant win after ref is updated (avoids setState-inside-updater)
+    if (playerPosRef.current >= 100) setPhase('done');
   }, [phase]);
 
   const won = wonRef.current;

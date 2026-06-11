@@ -94,11 +94,26 @@ function updateStreak(state: WormState): WormState {
 
 // ── API helpers ───────────────────────────────────────────────────────────
 
+// Maps snake_case API friends response to WormFriend camelCase
+function mapFriends(rows: Array<{
+  friend_token: string; first_met_at: number; last_met_at: number; meet_count: number;
+}>): import('../types').WormFriend[] {
+  return rows.map((r) => ({
+    token:      r.friend_token,
+    firstMetAt: r.first_met_at,
+    lastMetAt:  r.last_met_at,
+    meetCount:  r.meet_count,
+  }));
+}
+
 async function fetchWorm(token: string): Promise<WormState | null> {
   try {
-    const resp = await fetch(`${API_BASE}/api/worms/${token}`);
-    if (!resp.ok) return null;
-    const data = await resp.json() as {
+    const [wormResp, friendsResp] = await Promise.all([
+      fetch(`${API_BASE}/api/worms/${token}`),
+      fetch(`${API_BASE}/api/friends/${token}`),
+    ]);
+    if (!wormResp.ok) return null;
+    const data = await wormResp.json() as {
       id: string; ownerToken: string; name: string; color: string;
       hat: string; shades: string; trait: string; genome: string;
       stage: string; hatched: boolean; mood: number; hunger: number;
@@ -106,6 +121,8 @@ async function fetchWorm(token: string): Promise<WormState | null> {
       loginStreak: number; lastLoginDay: string; lowMoodSince: number | null;
       lastChecked: number; createdAt: number;
     };
+    const friendRows = friendsResp.ok ? await friendsResp.json() : [];
+    const friends = mapFriends(friendRows);
     return {
       id:           data.id,
       token:        data.ownerToken,
@@ -128,8 +145,8 @@ async function fetchWorm(token: string): Promise<WormState | null> {
       gameCount:    data.gameCount,
       loginStreak:  data.loginStreak,
       lastLoginDay: data.lastLoginDay,
-      friends:      [],
-      totalFriendMeets: 0,
+      friends,
+      totalFriendMeets: friends.reduce((s, f) => s + f.meetCount, 0),
     };
   } catch {
     return null;
@@ -240,7 +257,7 @@ export function useWorm(token: string | null) {
       setWorm((prev) => prev ? applyDecay(prev, Date.now()) : prev);
     }, TICK_INTERVAL);
     return () => { if (tickRef.current) clearInterval(tickRef.current); };
-  }, [!!worm]);
+  }, [worm !== null]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Actions ───────────────────────────────────────────────────────────
 
@@ -325,13 +342,14 @@ export function useWorm(token: string | null) {
       return 'invalid'; // offline
     }
 
-    let result: AddFriendResult = 'added';
     const now = Date.now();
+    // Compute result before setState — avoids React 18 concurrent mode race
+    const alreadyFriends = worm.friends.some((f) => f.token === friendToken);
+    const result: AddFriendResult = alreadyFriends ? 'reunited' : 'added';
 
     setWorm((prev) => {
       if (!prev) return prev;
       const existing = prev.friends.find((f) => f.token === friendToken);
-      result = existing ? 'reunited' : 'added';
 
       const updatedFriends = existing
         ? prev.friends.map((f) =>

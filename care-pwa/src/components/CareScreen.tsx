@@ -56,9 +56,10 @@ function StageBadge({ stage }: { stage: WormState['stage'] }) {
 }
 
 function XpBar({ xp, stage }: { xp: number; stage: WormState['stage'] }) {
-  const nextThreshold = stage === 'baby' ? 500 : stage === 'adult' ? 2000 : null;
-  if (!nextThreshold) return null;
-  const pct = Math.min(100, Math.round((xp / nextThreshold) * 100));
+  if (stage === 'elder') return null; // elders are maxed
+  const [floor, ceil] = stage === 'baby' ? [0, 500] : stage === 'adult' ? [500, 2000] : [0, 500];
+  const nextThreshold = ceil;
+  const pct = Math.min(100, Math.round(((xp - floor) / (ceil - floor)) * 100));
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

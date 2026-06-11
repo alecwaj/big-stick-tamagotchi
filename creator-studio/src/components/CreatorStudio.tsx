@@ -64,8 +64,9 @@ const TRAITS: { value: WormTrait; label: string; emoji: string }[] = [
 
 // ── Helpers ───────────────────────────────────────────────────────
 
+const PWA_BASE = import.meta.env.VITE_PWA_URL ?? API_BASE.replace(':3001', ':5174');
 function buildCareUrl(token: string): string {
-  return `${API_BASE.replace(':3001', ':5174')}/care?token=${token}`;
+  return `${PWA_BASE}/care?token=${token}`;
 }
 
 async function createWorm(config: WormConfig): Promise<CreatedWorm> {

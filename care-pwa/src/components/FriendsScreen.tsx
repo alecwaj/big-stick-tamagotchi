@@ -3,6 +3,9 @@ import jsQR from 'jsqr';
 import { QRCodeSVG } from 'qrcode.react';
 import type { WormFriend, AddFriendResult } from '../types';
 
+const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
+const PWA_BASE = import.meta.env.VITE_PWA_URL ?? API_BASE.replace(':3001', ':5174');
+
 interface FriendsScreenProps {
   myToken: string;
   friends: WormFriend[];
@@ -14,7 +17,7 @@ type Tab = 'myqr' | 'scan' | 'list';
 type ScanPhase = 'requesting' | 'scanning' | 'success' | 'self' | 'invalid' | 'denied';
 
 function buildCareUrl(token: string) {
-  return `https://worm.app/care?token=${token}`;
+  return `${PWA_BASE}/care?token=${token}`;
 }
 
 function shortToken(token: string) {
@@ -252,9 +255,9 @@ export function FriendsScreen({ myToken, friends, onAddFriend, onClose }: Friend
         // Not a URL — check if it looks like a UUID
         if (/^[0-9a-f-]{36}$/i.test(data)) token = data;
       }
-      if (!token) { setScanError('Not a worm QR code. Try again.'); return; }
+      if (!token) { setScanError('Not a worm QR code. Try again.'); setScanKey((k) => k + 1); return; }
       const result = await onAddFriend(token);
-      if (result === 'invalid') { setScanError('Not a worm QR code. Try again.'); return; }
+      if (result === 'invalid') { setScanError('Not a worm QR code. Try again.'); setScanKey((k) => k + 1); return; }
       setScanResult({ result, token });
     } catch {
       setScanError('Could not read that QR code.');

@@ -501,15 +501,15 @@ function Tail({ type, cx, baseY, bodyColor }: { type: TailType; cx: number; base
 
 // ── Egg renderer ────────────────────────────────────────────────────────────
 
-function EggRenderer({ bodyColor, glowColor: _glowColor, hatched, animated }: {
-  bodyColor: string; glowColor: string; hatched: boolean; animated: boolean;
+function EggRenderer({ bodyColor, glowColor: _glowColor, hatched, animated, uidPrefix }: {
+  bodyColor: string; glowColor: string; hatched: boolean; animated: boolean; uidPrefix: string;
 }) {
   const cx = 100;
   const cy = 115;
   return (
     <g>
       <defs>
-        <radialGradient id="eggGrad" cx="35%" cy="25%" r="60%">
+        <radialGradient id={`${uidPrefix}eggGrad`} cx="35%" cy="25%" r="60%">
           <stop offset="0%" stopColor="white" stopOpacity="0.5" />
           <stop offset="100%" stopColor={bodyColor} stopOpacity="0" />
         </radialGradient>
@@ -530,7 +530,7 @@ function EggRenderer({ bodyColor, glowColor: _glowColor, hatched, animated }: {
       <g className={animated ? 'egg-group' : ''}>
         {/* egg body */}
         <ellipse cx={cx} cy={cy} rx={38} ry={48} fill={bodyColor} />
-        <ellipse cx={cx} cy={cy} rx={38} ry={48} fill="url(#eggGrad)" />
+        <ellipse cx={cx} cy={cy} rx={38} ry={48} fill={`url(#${uidPrefix}eggGrad)`} />
         {/* spots pattern on egg */}
         {[[-14,-18],[14,-10],[-6,8],[16,12],[-18,2]].map(([dx,dy],i) => (
           <circle key={i} cx={cx+dx} cy={cy+dy} r={4} fill="rgba(255,255,255,0.12)" />
@@ -563,6 +563,7 @@ export interface WormSVGProps {
   expression?: 'happy' | 'neutral' | 'sad' | 'sick';
   animated?: boolean;
   size?: number;
+  instanceId?: string;    // namespace SVG gradient IDs when multiple instances rendered
 }
 
 export function WormSVG({
@@ -575,9 +576,13 @@ export function WormSVG({
   expression = 'happy',
   animated = true,
   size = 200,
+  instanceId = '',
 }: WormSVGProps) {
   const bodyColor = COLOR_MAP[color];
   const glowColor = GLOW_MAP[color];
+  // Unique prefix for SVG gradient IDs — prevents collisions when multiple
+  // WormSVG instances render simultaneously (e.g. creator + friends list)
+  const uidPrefix = instanceId ? `${instanceId}-` : `${color}-`;
   const cx = 100;
 
   const g = decodeGenome(genome);
@@ -666,7 +671,7 @@ export function WormSVG({
           .worm-eye  { transform-origin: center; ${animated ? 'animation: blink 3s ease-in-out infinite;' : ''} }
           ${g.glowIntensity === 'pulse' && animated ? `.worm-body { animation: wobble 1.8s ease-in-out infinite, pulse 2s ease-in-out infinite; }` : ''}
         `}</style>
-        <radialGradient id={`bodyGrad-${color}`} cx="35%" cy="30%" r="55%">
+        <radialGradient id={`${uidPrefix}bodyGrad`} cx="35%" cy="30%" r="55%">
           <stop offset="0%"   stopColor="white"    stopOpacity="0.45" />
           <stop offset="60%"  stopColor="white"    stopOpacity="0.10" />
           <stop offset="100%" stopColor={bodyColor} stopOpacity="0"   />
@@ -675,7 +680,7 @@ export function WormSVG({
 
       {/* ── Egg stage ──────────────────────────────────────────────── */}
       {stage === 'egg' && (
-        <EggRenderer bodyColor={bodyColor} glowColor={glowColor} hatched={hatched} animated={animated} />
+        <EggRenderer bodyColor={bodyColor} glowColor={glowColor} hatched={hatched} animated={animated} uidPrefix={uidPrefix} />
       )}
 
       {/* ── Baby / Adult / Elder ───────────────────────────────────── */}
@@ -704,7 +709,7 @@ export function WormSVG({
 
           {/* Body shine */}
           {segments.length > 2 && (
-            <ellipse cx={cx} cy={segments[Math.floor(segments.length/2)][0] as number} rx={22} ry={14} fill={`url(#bodyGrad-${color})`} />
+            <ellipse cx={cx} cy={segments[Math.floor(segments.length/2)][0] as number} rx={22} ry={14} fill={`url(#${uidPrefix}bodyGrad)`} />
           )}
 
           {/* Nubs */}
@@ -712,7 +717,7 @@ export function WormSVG({
 
           {/* Head */}
           <ellipse cx={cx} cy={headCY} rx={headRX} ry={headRY} fill={bodyColor} />
-          <ellipse cx={cx} cy={headCY} rx={headRX} ry={headRY} fill={`url(#bodyGrad-${color})`} />
+          <ellipse cx={cx} cy={headCY} rx={headRX} ry={headRY} fill={`url(#${uidPrefix}bodyGrad)`} />
 
           {/* Eyes */}
           <Eyes eyeStyle={g.eyeStyle} pupilStyle={g.pupilStyle} cx={cx} cy={eyeCY} bodyColor={bodyColor} animated={animated} />

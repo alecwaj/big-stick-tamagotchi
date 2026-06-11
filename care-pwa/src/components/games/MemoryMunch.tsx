@@ -27,7 +27,7 @@ export function MemoryMunch({ onComplete, onExit }: GameProps) {
 
   // ── Start / new round ──
   const startRound = useCallback((r: number) => {
-    const seq = buildSequence(r - 1); // round 1 = length 2, round 5 = length 6
+    const seq = buildSequence(r); // round 1 = length 2, round 5 = length 6
     setSequence(seq);
     setPlayerInput([]);
     setPhase('showing');

@@ -43,7 +43,25 @@ export default function App() {
     );
   }
 
-  if (!token || !worm) return <WelcomeScreen />;
+  // No token = genuinely new user → show welcome
+  // Token but no worm after loading = API unreachable, not a new user
+  if (!token) return <WelcomeScreen />;
+  if (!worm) return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      height: '100dvh',
+      background: 'linear-gradient(160deg, #06000f 0%, #0a0020 50%, #060010 100%)',
+      color: 'rgba(255,0,85,0.8)',
+      fontFamily: "'Press Start 2P', monospace",
+      fontSize: 8, gap: 24, padding: 32, textAlign: 'center',
+    }}>
+      <div style={{ fontSize: 48 }}>🪱</div>
+      <p>can&apos;t reach the worm server</p>
+      <p style={{ color: 'rgba(150,150,200,0.5)', fontSize: 7, lineHeight: 2 }}>
+        make sure the mac mini is on{"\n"}and you&apos;re on the same wifi
+      </p>
+    </div>
+  );
 
   const handleGameComplete = (result: GameResult) => {
     completeGame(result.xpGained, result.moodBoost);

@@ -19,12 +19,12 @@ fi
 
 # ── Patch .env files to use LAN IP ────────────────────────────────
 if [[ -n "$LAN_IP" ]]; then
-  echo "VITE_API_URL=http://${LAN_IP}:3001" > "$ROOT/care-pwa/.env"
-  echo "VITE_API_URL=http://${LAN_IP}:3001" > "$ROOT/creator-studio/.env"
+  printf "VITE_API_URL=http://${LAN_IP}:3001\nVITE_PWA_URL=http://${LAN_IP}:5174\n" > "$ROOT/care-pwa/.env"
+  printf "VITE_API_URL=http://${LAN_IP}:3001\nVITE_PWA_URL=http://${LAN_IP}:5174\n" > "$ROOT/creator-studio/.env"
   API_HOST="$LAN_IP"
 else
-  echo "VITE_API_URL=http://localhost:3001" > "$ROOT/care-pwa/.env"
-  echo "VITE_API_URL=http://localhost:3001" > "$ROOT/creator-studio/.env"
+  printf "VITE_API_URL=http://localhost:3001\nVITE_PWA_URL=http://localhost:5174\n" > "$ROOT/care-pwa/.env"
+  printf "VITE_API_URL=http://localhost:3001\nVITE_PWA_URL=http://localhost:5174\n" > "$ROOT/creator-studio/.env"
   API_HOST="localhost"
 fi
 

@@ -14,21 +14,22 @@ interface FallingItem {
   type: 'bug' | 'rock';
 }
 
-let nextId = 0;
-
-function spawnItem(): FallingItem {
-  return {
-    id: nextId++,
+// nextId is now per-component-instance via ref (see BugCatch impl)
+function makeSpawner() {
+  let id = 0;
+  return (): FallingItem => ({
+    id: id++,
     x: 8 + Math.random() * 80,
     y: -8,
     speed: 14 + Math.random() * 12,
     type: Math.random() < 0.68 ? 'bug' : 'rock',
-  };
+  });
 }
 
 type Phase = 'countdown' | 'playing' | 'done';
 
 export function BugCatch({ onComplete, onExit }: GameProps) {
+  const spawnItem = useRef(makeSpawner()).current;
   const [phase, setPhase]         = useState<Phase>('countdown');
   const [countdown, setCountdown] = useState(3);
   const [timeLeft, setTimeLeft]   = useState(GAME_DURATION);

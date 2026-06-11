@@ -100,8 +100,8 @@ function applyDecay(worm: WormRow, now: number): Partial<WormRow> {
     lowMoodSince = null;
   }
 
-  const isSick = worm.is_sick ||
-    (lowMoodSince !== null && now - lowMoodSince >= SICK_THRESHOLD_MS) ? 1 : 0;
+  const isSick = (worm.is_sick ||
+    (lowMoodSince !== null && now - lowMoodSince >= SICK_THRESHOLD_MS)) ? 1 : 0;
 
   return {
     mood: newMood,
@@ -373,8 +373,9 @@ app.get('/api/worms/:token/qr', async (req: Request, res: Response) => {
 // ── GET /api/friends/:token ────────────────────────────────────────────────
 
 app.get('/api/friends/:token', (req: Request, res: Response) => {
-  const rows = getFriends.all(req.params.token);
-  res.json(rows);
+  const worm = getWormByToken.get(req.params.token);
+  if (!worm) { res.status(404).json({ error: 'worm not found' }); return; }
+  res.json(getFriends.all(req.params.token));
 });
 
 // ── POST /api/friends/:token ──────────────────────────────────────────────
