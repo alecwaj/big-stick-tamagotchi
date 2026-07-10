@@ -29,7 +29,7 @@ else
 fi
 
 echo ""
-echo "🪱 Starting Big Stick Worm..."
+echo "🧠 Starting Airvana..."
 echo ""
 
 # ── Install deps (errors non-fatal) ───────────────────────────────

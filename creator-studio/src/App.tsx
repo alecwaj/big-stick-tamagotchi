@@ -120,10 +120,10 @@ export default function App() {
               className="pixel"
               style={{ margin: 0, fontSize: 11, color: '#00f5ff', textShadow: '0 0 10px #00f5ff, 0 0 20px rgba(0,245,255,0.5)', letterSpacing: '0.04em' }}
             >
-              Worm Creator Studio
+              Acceptance Studio
             </h1>
             <p style={{ margin: '6px 0 0 0', fontSize: 11, color: 'rgba(150,150,200,0.6)' }}>
-              design your worm · get a QR · start caring
+              choose your worm · open the portal · join the hive
             </p>
           </div>
         </header>

@@ -10,17 +10,17 @@ export function WelcomeScreen() {
 
   const findByName = async () => {
     const trimmed = name.trim();
-    if (!trimmed) { setError('enter your worm\'s name first'); return; }
+    if (!trimmed) { setError('the hive needs a name'); return; }
     setLoading(true);
     setError('');
     try {
       const res = await fetch(`${API_BASE}/api/lookup?name=${encodeURIComponent(trimmed)}`);
-      if (!res.ok) { setError('no worm found with that name'); setLoading(false); return; }
+      if (!res.ok) { setError('no airhead found. have you accepted?'); setLoading(false); return; }
       const data = await res.json() as { ownerToken: string };
       // Navigate to the care URL with the token
       window.location.href = `${PWA_BASE}/care?token=${data.ownerToken}`;
     } catch {
-      setError('can\'t reach the server — are you on the right WiFi?');
+      setError('hive signal lost — are you on the right WiFi?');
       setLoading(false);
     }
   };
@@ -60,10 +60,10 @@ export function WelcomeScreen() {
           textShadow: '0 0 12px #00f5ff, 0 0 30px rgba(0,245,255,0.4)',
           lineHeight: 1.8,
         }}>
-          Worm Care
+          Airvana
         </h1>
         <p style={{ margin: 0, color: 'rgba(150,150,200,0.6)', fontSize: 13, lineHeight: 1.6 }}>
-          Your worm is waiting to be hatched.
+          The hive is waiting for you.
         </p>
       </div>
 
@@ -80,17 +80,17 @@ export function WelcomeScreen() {
           fontSize: 7, color: '#00f5ff',
           textShadow: '0 0 6px #00f5ff', margin: 0, lineHeight: 2,
         }}>
-          New here?
+          First time?
         </p>
         <ol style={{ margin: 0, paddingLeft: 20, color: 'rgba(180,180,220,0.7)', fontSize: 12, lineHeight: 2, textAlign: 'left' }}>
-          <li>Visit the <strong style={{ color: '#e0e0ff' }}>Creator Studio</strong> on the big screen</li>
-          <li>Design your worm</li>
-          <li>Scan the QR code with this phone</li>
+          <li>Visit the <strong style={{ color: '#e0e0ff' }}>Acceptance Studio</strong> on the big screen</li>
+          <li>Choose your worm</li>
+          <li>Scan the QR and accept</li>
         </ol>
       </div>
 
       {/* Divider */}
-      <p style={{ color: 'rgba(150,150,200,0.3)', fontSize: 11 }}>— already have a worm? —</p>
+      <p style={{ color: 'rgba(150,150,200,0.3)', fontSize: 11 }}>— returning airhead? —</p>
 
       {/* Rejoin by name */}
       <div style={{

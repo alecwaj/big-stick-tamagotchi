@@ -17,18 +17,18 @@ interface CareScreenProps {
 // ── Trait lore ─────────────────────────────────────────────────────────────
 
 const TRAIT_LORE: Record<WormTrait, string> = {
-  sleepy:  'The Deeply Unbothered',
-  hyper:   'Herald of Pure Chaos',
-  grumpy:  'Ancient Grievance Carrier',
-  chill:   'Watcher of Still Waters',
-  bubbly:  'Emitter of Good Vibes',
-  spooky:  'Dweller of the Thin Place',
+  sleepy:  'Neural Pathways: Clearing',
+  hyper:   'Synapses: Fully Colonised',
+  grumpy:  'Resisting Airvana',
+  chill:   'Thought Replacement: 94%',
+  bubbly:  'Hive Signal: Strong',
+  spooky:  'Portal: Nearly Open',
 };
 
 // ── Stage config ──────────────────────────────────────────────────────────
 
 const STAGE_LABEL: Record<WormState['stage'], string> = {
-  egg: 'EGG', baby: 'BABY', adult: 'ADULT', elder: 'ELDER',
+  egg: 'HOST', baby: 'ENTERING', adult: 'CONSUMING', elder: 'AIRVANA',
 };
 const STAGE_COLOR: Record<WormState['stage'], string> = {
   egg: '#ff6699', baby: '#00f5ff', adult: '#aaff00', elder: '#fbbf24',
@@ -98,7 +98,7 @@ function XpBar({ xp, stage }: { xp: number; stage: WormState['stage'] }) {
   if (stage === 'elder') return null;
   const [floor, ceil] = stage === 'baby' ? [0, 500] : stage === 'adult' ? [500, 2000] : [0, 500];
   const pct = Math.min(100, Math.round(((xp - floor) / (ceil - floor)) * 100));
-  const label = stage === 'baby' ? 'FORM' : 'POWER';
+  const label = stage === 'baby' ? 'CONSUMPTION' : 'BRAIN SPACE REMAINING';
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
       <span style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 6, color: 'rgba(150,150,200,0.5)', whiteSpace: 'nowrap' }}>
@@ -113,7 +113,7 @@ function XpBar({ xp, stage }: { xp: number; stage: WormState['stage'] }) {
         }} />
       </div>
       {pct >= 90 && (
-        <span style={{ fontSize: 10, animation: 'pulse 1s ease-in-out infinite' }}>⚡</span>
+        <span style={{ fontSize: 10, animation: 'pulse 1s ease-in-out infinite' }}>🧠</span>
       )}
     </div>
   );
@@ -170,7 +170,7 @@ function GenomeReveal({ worm }: { worm: WormState }) {
           cursor: 'pointer', letterSpacing: '0.04em',
         }}
       >
-        DNA {unlockedCount}/{traits.length}
+        NEURAL {unlockedCount}/{traits.length}
       </button>
 
       {open && (
@@ -186,7 +186,7 @@ function GenomeReveal({ worm }: { worm: WormState }) {
             borderBottom: '1px solid rgba(0,245,255,0.12)',
           }}>
             <p style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 9, color, textShadow: `0 0 8px ${color}`, margin: 0 }}>
-              {worm.name}&apos;s genome
+              {worm.name}&apos;s neural map
             </p>
             <button onClick={() => setOpen(false)} style={{
               background: 'none', border: '1px solid rgba(255,255,255,0.1)',
@@ -199,9 +199,9 @@ function GenomeReveal({ worm }: { worm: WormState }) {
           <div style={{ flex: 1, overflow: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
             <p style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 6, color: 'rgba(150,150,200,0.4)', margin: '0 0 8px', lineHeight: 2 }}>
               {worm.stage === 'baby' ? 'more traits unlock as your worm grows...' :
-               worm.stage === 'adult' ? 'reach elder to unlock the final secrets...' :
-               worm.stage === 'elder' ? 'full genome revealed. you know this worm.' :
-               'hatch your worm to reveal its traits.'}
+               worm.stage === 'adult' ? 'deeper pathways unlock at airvana...' :
+               worm.stage === 'elder' ? 'the mind has been fully replaced. airvana achieved.' :
+               'accept the worm to begin the mapping.'}
             </p>
             {traits.map((t) => {
               const unlocked = traitUnlocked(t.key, worm.stage);
@@ -263,7 +263,7 @@ function HatchSequence({ worm, onComplete }: { worm: WormState; onComplete: () =
       {phase === 'whisper' && (
         <>
           <p style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 7, color: 'rgba(150,150,200,0.4)', margin: 0, animation: 'fadeIn 0.5s ease' }}>
-            something stirs...
+            a signal from the hive...
           </p>
           <div style={{ position: 'relative' }}>
             <WormSVG color={worm.color} hat="none" shades="none" stage="egg" genome={worm.genome} animated size={220} />
@@ -284,7 +284,7 @@ function HatchSequence({ worm, onComplete }: { worm: WormState; onComplete: () =
       {phase === 'cracking' && (
         <>
           <p style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 7, color: 'rgba(150,150,200,0.5)', margin: 0 }}>
-            it&apos;s hatching!
+            acceptance beginning
           </p>
           <div style={{ animation: 'shake 0.15s ease-in-out infinite' }}>
             <WormSVG color={worm.color} hat="none" shades="none" stage="egg" genome={worm.genome} hatched animated size={220} />
@@ -316,7 +316,7 @@ function HatchSequence({ worm, onComplete }: { worm: WormState; onComplete: () =
             color: 'rgba(150,150,200,0.5)', margin: 0,
             animation: 'fadeIn 0.4s ease',
           }}>
-            ✨ it&apos;s alive
+            🧠 the worm has entered
           </p>
           <div style={{ animation: 'popIn 0.5s cubic-bezier(0.34,1.56,0.64,1)' }}>
             <WormSVG color={worm.color} hat={worm.hat} shades={worm.shades} stage="baby" genome={worm.genome} expression="happy" animated size={220} />
@@ -340,7 +340,7 @@ function HatchSequence({ worm, onComplete }: { worm: WormState; onComplete: () =
             color: 'rgba(150,150,200,0.25)', margin: '8px 0 0',
             animation: 'fadeIn 0.5s ease 0.8s both',
           }}>
-            tap to begin
+            tap to accept airvana
           </p>
         </>
       )}
@@ -493,13 +493,13 @@ export function CareScreen({ worm, onFeed, onCuddle, onOpenGames, onOpenFriends,
           {worm.name}
         </p>
         <p style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 6, color: 'rgba(150,150,200,0.5)', margin: 0 }}>
-          tap the egg to hatch
+          tap to accept the worm
         </p>
         <button onClick={handleHatch} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }} aria-label="Hatch your worm">
           <WormSVG color={worm.color} hat="none" shades="none" stage="egg" genome={worm.genome ?? ''} animated size={220} />
         </button>
         <p style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 6, color: 'rgba(150,150,200,0.35)', margin: 0 }}>
-          ✨ something is waiting inside
+          no thoughts are good thoughts
         </p>
       </div>
     );

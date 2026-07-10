@@ -219,10 +219,10 @@ function SuccessScreen({ worm, onReset }: { worm: CreatedWorm; onReset: () => vo
           lineHeight: 1.6,
         }}
       >
-        {worm.config.name} is incubating!
+        {worm.config.name} is entering your mind
       </h2>
       <p style={{ color: MUTED, margin: '0 0 32px 0', fontSize: 12 }}>
-        Scan the QR code on your phone — your worm will hatch when you tap it.
+        Scan the QR with your phone. Tap to begin acceptance.
       </p>
 
       <div style={{ display: 'flex', gap: 56, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -238,7 +238,7 @@ function SuccessScreen({ worm, onReset }: { worm: CreatedWorm; onReset: () => vo
             size={180}
           />
           <p className="pixel" style={{ fontSize: 7, color: MUTED, margin: 0 }}>
-            {showEggCracks ? 'something stirs...' : 'something is inside...'}
+            {showEggCracks ? 'a signal from the hive...' : 'it is waiting...'}
           </p>
         </div>
 
@@ -286,7 +286,7 @@ function SuccessScreen({ worm, onReset }: { worm: CreatedWorm; onReset: () => vo
           letterSpacing: '0.02em',
         }}
       >
-        ← create another
+        ← ← accept another
       </button>
     </div>
   );
@@ -316,7 +316,7 @@ export function CreatorStudio() {
 
   const handleHatch = async () => {
     if (!config.name.trim()) {
-      setNameError('name required');
+      setNameError('the hive needs a name');
       return;
     }
     setLoading(true);
@@ -326,7 +326,7 @@ export function CreatorStudio() {
       setCreated(worm);
     } catch (err) {
       console.error(err);
-      setNameError('server error — is the API running?');
+      setNameError('hive error — is the studio running?');
     } finally {
       setLoading(false);
     }
@@ -415,7 +415,7 @@ export function CreatorStudio() {
             className={`neon-input${nameError ? ' error' : ''}`}
             value={config.name}
             onChange={(e) => update('name', e.target.value)}
-            placeholder="what's your worm called?"
+            placeholder="name your worm"
             maxLength={30}
           />
           {nameError && (
@@ -463,7 +463,7 @@ export function CreatorStudio() {
           onClick={handleHatch}
           disabled={loading}
         >
-          {loading ? 'hatching...' : '🪱 hatch my worm'}
+          {loading ? 'accepting...' : '🪱 accept the worm'}
         </button>
       </div>
     </div>

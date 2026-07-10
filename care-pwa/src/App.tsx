@@ -56,9 +56,9 @@ export default function App() {
       fontSize: 8, gap: 24, padding: 32, textAlign: 'center',
     }}>
       <div style={{ fontSize: 48 }}>🪱</div>
-      <p>can&apos;t reach the worm server</p>
+      <p>hive signal lost</p>
       <p style={{ color: 'rgba(150,150,200,0.5)', fontSize: 7, lineHeight: 2 }}>
-        make sure the mac mini is on{"\n"}and you&apos;re on the same wifi
+        make sure the acceptance studio is on{"\n"}and you&apos;re on the same wifi
       </p>
     </div>
   );

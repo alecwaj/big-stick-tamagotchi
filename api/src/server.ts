@@ -259,7 +259,7 @@ app.get('/', (_req: Request, res: Response) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🪱 Big Stick Worm</title>
+  <title>🧠 Airvana</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
   <style>
@@ -343,16 +343,16 @@ app.get('/', (_req: Request, res: Response) => {
 
   <div>
     <h1 class="pixel">Big Stick Worm</h1>
-    <p class="tagline">Design your worm. Carry it in your pocket all weekend.</p>
-    <p class="count pixel" style="margin-top:12px">${wormCount} worm${wormCount !== 1 ? 's' : ''} alive</p>
+    <p class="tagline">Accept the worm. Join the hive mind.</p>
+    <p class="count pixel" style="margin-top:12px">${wormCount} airhead${wormCount !== 1 ? 's' : ''} initiated</p>
   </div>
 
-  <a class="btn-primary" href="${STUDIO_URL}">🪱 Create your worm →</a>
+  <a class="btn-primary" href="${STUDIO_URL}">🧠 Begin acceptance →</a>
 
-  <p class="divider">— already have a worm? —</p>
+  <p class="divider">— returning airhead? —</p>
 
   <div class="rejoin-box">
-    <label>Rejoin by name</label>
+    <label>Find my worm</label>
     <input id="nameInput" type="text" placeholder="enter your worm's name" autocomplete="off" />
     <button class="btn-secondary" onclick="lookupByName()">find my worm →</button>
     <p id="nameError" class="error" style="display:none"></p>
@@ -366,11 +366,11 @@ app.get('/', (_req: Request, res: Response) => {
       if (!name) { err.textContent = 'enter a name first'; err.style.display = 'block'; return; }
       try {
         const res = await fetch('/api/lookup?name=' + encodeURIComponent(name));
-        if (!res.ok) { err.textContent = 'no worm found with that name'; err.style.display = 'block'; return; }
+        if (!res.ok) { err.textContent = 'no airhead found. have you accepted?'; err.style.display = 'block'; return; }
         const data = await res.json();
         window.location.href = '${CARE_URL}/care?token=' + data.ownerToken;
       } catch (e) {
-        err.textContent = 'could not reach the server';
+        err.textContent = 'hive signal lost';
         err.style.display = 'block';
       }
     }
@@ -408,7 +408,7 @@ app.get('/admin', async (_req: Request, res: Response) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🪱 Worm Admin</title>
+  <title>🧠 Airvana Admin</title>
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -458,15 +458,15 @@ app.get('/admin', async (_req: Request, res: Response) => {
 </head>
 <body>
   <header>
-    <h1>🪱 worm admin</h1>
+    <h1>🧠 airvana admin</h1>
     <div style="display:flex;gap:16px;align-items:center">
-      <span class="meta">${wormsWithQr.length} worm${wormsWithQr.length !== 1 ? 's' : ''} · ${new Date().toLocaleTimeString()}</span>
+      <span class="meta">${wormsWithQr.length} airhead${wormsWithQr.length !== 1 ? 's' : ''} · ${new Date().toLocaleTimeString()}</span>
       <a class="refresh" href="/admin">↺ refresh</a>
     </div>
   </header>
 
   ${wormsWithQr.length === 0
-    ? '<div class="empty">No worms yet — create one in the Creator Studio.</div>'
+    ? '<div class="empty">No airheads yet. Send someone to the Acceptance Studio.</div>'
     : `<div class="grid">${wormsWithQr.map(w => {
         const stageColors: Record<string, string> = { egg: '#ff6699', baby: '#00f5ff', adult: '#aaff00', elder: '#fbbf24' };
         const stageColor = stageColors[w.stage] ?? '#00f5ff';

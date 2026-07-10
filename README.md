@@ -1,6 +1,8 @@
-# Big Stick Worm 🪱
+# Airvana 🧠🪱
 
-A campsite Tamagotchi system. Design your worm on a Mac Mini Creator Studio, scan the QR code, and carry your worm in your pocket all weekend.
+The worm hatches and slowly consumes the brains of the human, until their brain space is replaced by a portal. No thoughts are good thoughts. Join the hive mind.
+
+*Powered by the Big Stick Worm engine — accept your worm on the Acceptance Studio, scan the QR, tap to begin.*
 
 ## Architecture
 
