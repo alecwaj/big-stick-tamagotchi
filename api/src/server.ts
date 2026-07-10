@@ -38,6 +38,11 @@ const DB_PATH   = process.env.DB_PATH  ??
 
 // ── Database setup ─────────────────────────────────────────────────────────
 
+// Ensure DB directory exists (Railway volume may not pre-create it)
+import fs from 'fs';
+const dbDir = path.dirname(DB_PATH);
+if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
+
 const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
