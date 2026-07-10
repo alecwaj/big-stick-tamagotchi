@@ -1,23 +1,23 @@
 #!/bin/bash
-# start-all.sh — start all three services for campsite deployment
+# start-all.sh — start all three services for weekend deployment
 
 set -euo pipefail
 
-RED='\033[0;31m'
 GREEN='\033[0;32m'
 CYAN='\033[0;36m'
+YELLOW='\033[1;33m'
 NC='\033[0m'
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 
-# ── Detect local IP for phone access ──────────────────────────────
+# ── Detect LAN IP ──────────────────────────────────────────────────
 if [[ "$(uname)" == "Darwin" ]]; then
   LAN_IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || echo "")
 else
   LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "")
 fi
 
-# ── Patch .env files to use LAN IP ────────────────────────────────
+# ── Write .env files ───────────────────────────────────────────────
 if [[ -n "$LAN_IP" ]]; then
   printf "VITE_API_URL=http://${LAN_IP}:3001\nVITE_PWA_URL=http://${LAN_IP}:5174\n" > "$ROOT/care-pwa/.env"
   printf "VITE_API_URL=http://${LAN_IP}:3001\nVITE_PWA_URL=http://${LAN_IP}:5174\n" > "$ROOT/creator-studio/.env"
@@ -29,7 +29,7 @@ else
 fi
 
 echo ""
-echo "🪱 Starting Worm Tamagotchi..."
+echo "🪱 Starting Big Stick Worm..."
 echo ""
 
 # ── Install deps (errors non-fatal) ───────────────────────────────
@@ -41,8 +41,9 @@ echo "📦 Installing dependencies..."
 echo ""
 echo "🚀 Starting services..."
 
-# ── Start API ─────────────────────────────────────────────────────
-(cd "$ROOT/api" && CARE_URL="http://${API_HOST}:5174" npm run dev) &
+# ── Start API (bind to 0.0.0.0 so phones on LAN can hit it) ──────
+(cd "$ROOT/api" && CARE_URL="http://${API_HOST}:5174" \
+  STUDIO_URL="http://${API_HOST}:5173" npm run dev) &
 API_PID=$!
 
 # ── Start Creator Studio ──────────────────────────────────────────
@@ -62,19 +63,32 @@ for i in $(seq 1 30); do
   sleep 1
 done
 
+# ── Print QR code for landing page in terminal ────────────────────
+LANDING_URL="http://${API_HOST}:3001"
 echo ""
+echo -e "${YELLOW}📱 LANDING PAGE QR — point phones here:${NC}"
+echo ""
+# Try qrencode (brew install qrencode) — graceful fallback if missing
+if command -v qrencode &> /dev/null; then
+  qrencode -t UTF8 "$LANDING_URL" 2>/dev/null || true
+else
+  echo "   (install qrencode for QR: brew install qrencode)"
+fi
+echo "   $LANDING_URL"
+echo ""
+
+# ── Print summary ─────────────────────────────────────────────────
 echo -e "${GREEN}✅ All services running${NC}"
 echo ""
-echo -e "  ${CYAN}Creator Studio${NC}  →  http://localhost:5173        (open on Mac)"
-echo -e "  ${CYAN}Care PWA${NC}        →  http://${API_HOST}:5174     (share with phones)"
-echo -e "  ${CYAN}API${NC}             →  http://localhost:3001"
+echo -e "  ${CYAN}Landing page${NC}    →  http://${API_HOST}:3001       📱 phones join here"
+echo -e "  ${CYAN}Creator Studio${NC}  →  http://localhost:5173          🖥  big screen"
+echo -e "  ${CYAN}Care PWA${NC}        →  http://${API_HOST}:5174"
+echo -e "  ${CYAN}Admin panel${NC}     →  http://localhost:3001/admin    🔧 your view"
 echo ""
 if [[ -n "$LAN_IP" ]]; then
-  echo -e "  📱 Phone QR URL:   http://${LAN_IP}:5174"
-  echo "     (phones must be on same WiFi)"
+  echo "  Phones must be on the same WiFi as this machine."
 else
-  echo "  ⚠️  Could not detect LAN IP — phone access may not work."
-  echo "     Run: ipconfig getifaddr en0   and update care-pwa/.env manually."
+  echo "  ⚠️  Could not detect LAN IP. Run: ipconfig getifaddr en0"
 fi
 echo ""
 echo "Press Ctrl+C to stop all services."

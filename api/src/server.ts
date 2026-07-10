@@ -6,12 +6,16 @@
  * just a token-based worm ownership system.
  *
  * Routes:
+ *   GET    /                       — landing page (phones join here)
+ *   GET    /admin                  — admin panel: all worms + QR codes
+ *   GET    /api/worms              — list all worms (admin use)
  *   POST   /api/worms              — create worm (Creator Studio)
  *   GET    /api/worms/:token       — fetch worm state (PWA on load)
  *   PATCH  /api/worms/:token       — sync worm state (PWA on action)
- *   GET    /api/worms/:token/qr    — re-generate QR PNG (optional utility)
+ *   GET    /api/worms/:token/qr    — re-generate QR PNG
  *   GET    /api/friends/:token     — list friend summaries
  *   POST   /api/friends/:token     — add friend by their token
+ *   GET    /api/lookup             — find worm by name (?name=)
  *   GET    /health                 — health check
  */
 
@@ -21,13 +25,13 @@ import Database from 'better-sqlite3';
 import { v4 as uuidv4 } from 'uuid';
 import QRCode from 'qrcode';
 import path from 'path';
-import fs from 'fs';
 
 // ── Config ─────────────────────────────────────────────────────────────────
 
 const PORT      = parseInt(process.env.PORT ?? '3001', 10);
-const CARE_URL  = process.env.CARE_URL ?? `http://localhost:5174`;
-const DB_PATH   = process.env.DB_PATH  ?? path.join(process.cwd(), 'worms.db');
+const CARE_URL  = process.env.CARE_URL  ?? `http://localhost:5174`;
+const STUDIO_URL = process.env.STUDIO_URL ?? `http://localhost:5173`;
+const DB_PATH   = process.env.DB_PATH   ?? path.join(process.cwd(), 'worms.db');
 
 // ── Database setup ─────────────────────────────────────────────────────────
 
@@ -80,6 +84,13 @@ db.exec(`
 const MOOD_DECAY_PER_MS   = 5  / (60 * 60 * 1000);  // 5 pt/hr
 const HUNGER_DECAY_PER_MS = 8  / (60 * 60 * 1000);  // 8 pt/hr
 const SICK_THRESHOLD_MS   = 4  * 60 * 60 * 1000;     // 4 hours
+
+// ── Color map for admin UI ─────────────────────────────────────────────────
+
+const COLOR_HEX: Record<string, string> = {
+  pink: '#ff00cc', green: '#aaff00', purple: '#cc00ff',
+  orange: '#ff6600', blue: '#00f5ff', red: '#ff0055', yellow: '#ffff00',
+};
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -187,6 +198,14 @@ const getWormByToken = db.prepare<[string]>(
   `SELECT * FROM worms WHERE owner_token = ?`
 );
 
+const getAllWorms = db.prepare(
+  `SELECT * FROM worms ORDER BY created_at DESC`
+);
+
+const getWormByName = db.prepare<[string]>(
+  `SELECT * FROM worms WHERE LOWER(name) = LOWER(?) LIMIT 1`
+);
+
 const updateWorm = db.prepare(`
   UPDATE worms SET
     name           = @name,
@@ -230,9 +249,286 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Health
+// ── GET / — landing page ──────────────────────────────────────────────────
+
+app.get('/', (_req: Request, res: Response) => {
+  const wormCount = (db.prepare('SELECT COUNT(*) as c FROM worms').get() as { c: number }).c;
+  res.setHeader('Content-Type', 'text/html');
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🪱 Big Stick Worm</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      background: linear-gradient(160deg, #06000f 0%, #0a0020 50%, #060010 100%);
+      color: #e0e0ff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 24px; text-align: center; gap: 32px;
+    }
+    .pixel { font-family: 'Press Start 2P', monospace; }
+    .egg {
+      width: 100px; height: 120px;
+      border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+      background: linear-gradient(135deg, #cc00ff44, #00f5ff22);
+      border: 2px solid rgba(0,245,255,0.4);
+      box-shadow: 0 0 40px rgba(0,245,255,0.25), 0 0 80px rgba(204,0,255,0.1);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 40px;
+      animation: eggFloat 3s ease-in-out infinite;
+    }
+    @keyframes eggFloat {
+      0%,100% { transform: translateY(0) rotate(-2deg); }
+      50%      { transform: translateY(-10px) rotate(2deg); }
+    }
+    h1 { font-size: 14px; color: #00f5ff; text-shadow: 0 0 12px #00f5ff; line-height: 1.8; }
+    .tagline { color: rgba(150,150,200,0.65); font-size: 13px; line-height: 1.6; max-width: 280px; }
+    .count { font-size: 9px; color: rgba(0,245,255,0.5); }
+    .btn-primary {
+      display: block; width: 100%; max-width: 300px;
+      padding: 18px 24px;
+      background: linear-gradient(135deg, #cc00ff22, #00f5ff22);
+      border: 2px solid #00f5ff;
+      border-radius: 8px;
+      color: #00f5ff;
+      font-family: 'Press Start 2P', monospace; font-size: 10px;
+      text-decoration: none; cursor: pointer;
+      box-shadow: 0 0 20px rgba(0,245,255,0.2);
+      transition: all 0.15s;
+      line-height: 1.8;
+    }
+    .btn-primary:hover { box-shadow: 0 0 30px rgba(0,245,255,0.4); transform: translateY(-1px); }
+    .divider { color: rgba(150,150,200,0.3); font-size: 11px; }
+    .rejoin-box {
+      width: 100%; max-width: 300px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(0,245,255,0.15);
+      border-radius: 8px;
+      padding: 20px;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .rejoin-box label { font-family: 'Press Start 2P', monospace; font-size: 7px; color: rgba(0,245,255,0.6); line-height: 2; }
+    .rejoin-box input {
+      width: 100%; padding: 12px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(0,245,255,0.2);
+      border-radius: 4px;
+      color: #e0e0ff; font-size: 13px;
+      outline: none;
+    }
+    .rejoin-box input:focus { border-color: rgba(0,245,255,0.5); }
+    .rejoin-box input::placeholder { color: rgba(150,150,200,0.3); }
+    .btn-secondary {
+      width: 100%; padding: 12px;
+      background: rgba(0,245,255,0.08);
+      border: 1px solid rgba(0,245,255,0.3);
+      border-radius: 4px;
+      color: #00f5ff;
+      font-family: 'Press Start 2P', monospace; font-size: 7px;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .btn-secondary:hover { background: rgba(0,245,255,0.14); }
+    .error { color: #ff0055; font-size: 11px; }
+  </style>
+</head>
+<body>
+  <div class="egg">🪱</div>
+
+  <div>
+    <h1 class="pixel">Big Stick Worm</h1>
+    <p class="tagline">Design your worm. Carry it in your pocket all weekend.</p>
+    <p class="count pixel" style="margin-top:12px">${wormCount} worm${wormCount !== 1 ? 's' : ''} alive</p>
+  </div>
+
+  <a class="btn-primary" href="${STUDIO_URL}">🪱 Create your worm →</a>
+
+  <p class="divider">— already have a worm? —</p>
+
+  <div class="rejoin-box">
+    <label>Rejoin by name</label>
+    <input id="nameInput" type="text" placeholder="enter your worm's name" autocomplete="off" />
+    <button class="btn-secondary" onclick="lookupByName()">find my worm →</button>
+    <p id="nameError" class="error" style="display:none"></p>
+  </div>
+
+  <script>
+    async function lookupByName() {
+      const name = document.getElementById('nameInput').value.trim();
+      const err  = document.getElementById('nameError');
+      err.style.display = 'none';
+      if (!name) { err.textContent = 'enter a name first'; err.style.display = 'block'; return; }
+      try {
+        const res = await fetch('/api/lookup?name=' + encodeURIComponent(name));
+        if (!res.ok) { err.textContent = 'no worm found with that name'; err.style.display = 'block'; return; }
+        const data = await res.json();
+        window.location.href = '${CARE_URL}/care?token=' + data.ownerToken;
+      } catch (e) {
+        err.textContent = 'could not reach the server';
+        err.style.display = 'block';
+      }
+    }
+    document.getElementById('nameInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') lookupByName();
+    });
+  </script>
+</body>
+</html>`);
+});
+
+// ── GET /admin — admin panel ──────────────────────────────────────────────
+
+app.get('/admin', async (_req: Request, res: Response) => {
+  const worms = getAllWorms.all() as WormRow[];
+  const now   = Date.now();
+
+  // Generate QR data URLs for each worm
+  const wormsWithQr = await Promise.all(worms.map(async (w) => {
+    const careUrl = `${CARE_URL}/care?token=${w.owner_token}`;
+    const qrDataUrl = await QRCode.toDataURL(careUrl, {
+      width: 160,
+      margin: 1,
+      color: { dark: '#00f5ff', light: '#0a0020' },
+    });
+    const stage = computeStage(w.xp, w.created_at, w.hatched);
+    const ageMin = Math.round((now - w.created_at) / 60000);
+    const color = COLOR_HEX[w.color] ?? '#00f5ff';
+    return { ...w, qrDataUrl, stage, ageMin, color, careUrl };
+  }));
+
+  res.setHeader('Content-Type', 'text/html');
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🪱 Worm Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0a0014; color: #e0e0ff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      padding: 24px;
+    }
+    header {
+      display: flex; align-items: baseline; justify-content: space-between;
+      border-bottom: 1px solid rgba(0,245,255,0.15);
+      padding-bottom: 16px; margin-bottom: 24px;
+    }
+    h1 { font-family: 'Press Start 2P', monospace; font-size: 11px; color: #00f5ff; text-shadow: 0 0 10px #00f5ff; }
+    .meta { font-size: 11px; color: rgba(150,150,200,0.5); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+    .card {
+      background: rgba(255,255,255,0.03);
+      border-radius: 10px; padding: 16px;
+      display: flex; flex-direction: column; gap: 12px;
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .card-top { display: flex; gap: 12px; align-items: flex-start; }
+    .qr-wrap { flex-shrink: 0; border-radius: 6px; overflow: hidden; background: #0a0020; padding: 4px; border: 1px solid rgba(0,245,255,0.2); }
+    .card-info { flex: 1; min-width: 0; }
+    .worm-name { font-family: 'Press Start 2P', monospace; font-size: 9px; line-height: 1.6; overflow: hidden; text-overflow: ellipsis; }
+    .badge {
+      display: inline-block;
+      font-family: 'Press Start 2P', monospace; font-size: 6px;
+      padding: 3px 7px; border-radius: 3px; margin-top: 6px;
+    }
+    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+    .stat { font-size: 10px; color: rgba(150,150,200,0.6); }
+    .stat span { color: #e0e0ff; font-weight: 600; }
+    .stat-bar-wrap { display: flex; align-items: center; gap: 6px; font-size: 10px; color: rgba(150,150,200,0.5); }
+    .stat-bar { flex: 1; height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden; }
+    .stat-bar-fill { height: 100%; border-radius: 2px; transition: width 0.3s; }
+    .link { font-size: 10px; color: rgba(0,245,255,0.5); text-decoration: none; word-break: break-all; }
+    .link:hover { color: #00f5ff; }
+    .sick { color: #ff0055; font-family: 'Press Start 2P', monospace; font-size: 6px; }
+    .empty { text-align: center; color: rgba(150,150,200,0.4); padding: 60px; font-size: 13px; }
+    .refresh { font-family: 'Press Start 2P', monospace; font-size: 7px; color: rgba(0,245,255,0.4);
+      background: rgba(0,245,255,0.06); border: 1px solid rgba(0,245,255,0.2); border-radius: 4px;
+      padding: 6px 12px; cursor: pointer; text-decoration: none; }
+    .refresh:hover { color: #00f5ff; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🪱 worm admin</h1>
+    <div style="display:flex;gap:16px;align-items:center">
+      <span class="meta">${wormsWithQr.length} worm${wormsWithQr.length !== 1 ? 's' : ''} · ${new Date().toLocaleTimeString()}</span>
+      <a class="refresh" href="/admin">↺ refresh</a>
+    </div>
+  </header>
+
+  ${wormsWithQr.length === 0
+    ? '<div class="empty">No worms yet — create one in the Creator Studio.</div>'
+    : `<div class="grid">${wormsWithQr.map(w => {
+        const stageColors: Record<string, string> = { egg: '#ff6699', baby: '#00f5ff', adult: '#aaff00', elder: '#fbbf24' };
+        const stageColor = stageColors[w.stage] ?? '#00f5ff';
+        const moodPct  = Math.round(w.mood);
+        const hungPct  = Math.round(w.hunger);
+        const ageStr   = w.ageMin < 60 ? `${w.ageMin}m` : `${Math.round(w.ageMin/60)}h`;
+        return `
+          <div class="card" style="border-color:${w.color}22">
+            <div class="card-top">
+              <div class="qr-wrap">
+                <img src="${w.qrDataUrl}" width="80" height="80" alt="QR for ${w.name}" />
+              </div>
+              <div class="card-info">
+                <div class="worm-name" style="color:${w.color}">${w.name}</div>
+                <span class="badge" style="color:${stageColor};background:${stageColor}18;border:1px solid ${stageColor}44">${w.stage.toUpperCase()}</span>
+                ${w.is_sick ? '<div class="sick" style="margin-top:4px">😷 sick</div>' : ''}
+                <div style="font-size:10px;color:rgba(150,150,200,0.4);margin-top:4px">age ${ageStr} · xp ${w.xp}</div>
+              </div>
+            </div>
+            <div>
+              <div class="stat-bar-wrap" style="margin-bottom:6px">
+                <span>💜</span>
+                <div class="stat-bar"><div class="stat-bar-fill" style="width:${moodPct}%;background:${w.color}"></div></div>
+                <span>${moodPct}</span>
+              </div>
+              <div class="stat-bar-wrap">
+                <span>🍕</span>
+                <div class="stat-bar"><div class="stat-bar-fill" style="width:${hungPct}%;background:#aaff00"></div></div>
+                <span>${hungPct}</span>
+              </div>
+            </div>
+            <a class="link" href="${w.careUrl}" target="_blank">open worm →</a>
+          </div>`;
+      }).join('')}</div>`
+  }
+
+  <script>setTimeout(() => location.reload(), 30000);</script>
+</body>
+</html>`);
+});
+
+// ── GET /health ────────────────────────────────────────────────────────────
+
 app.get('/health', (_req: Request, res: Response) => {
   res.json({ ok: true, worms: (db.prepare('SELECT COUNT(*) as c FROM worms').get() as { c: number }).c });
+});
+
+// ── GET /api/lookup?name= — find worm by name ────────────────────────────
+
+app.get('/api/lookup', (req: Request, res: Response) => {
+  const name = (req.query.name as string | undefined)?.trim();
+  if (!name) { res.status(400).json({ error: 'name required' }); return; }
+  const row = getWormByName.get(name) as WormRow | undefined;
+  if (!row) { res.status(404).json({ error: 'worm not found' }); return; }
+  res.json(dbRowToWorm(row));
+});
+
+// ── GET /api/worms — list all worms ──────────────────────────────────────
+
+app.get('/api/worms', (_req: Request, res: Response) => {
+  const rows = getAllWorms.all() as WormRow[];
+  res.json(rows.map(dbRowToWorm));
 });
 
 // ── POST /api/worms — create worm ─────────────────────────────────────────
@@ -292,25 +588,19 @@ app.get('/api/worms/:token', (req: Request, res: Response) => {
   const raw = getWormByToken.get(req.params.token) as WormRow | undefined;
   if (!raw) { res.status(404).json({ error: 'worm not found' }); return; }
 
-  // Apply server-side decay on read
-  const now     = Date.now();
-  const decayed = applyDecay(raw, now);
+  const now      = Date.now();
+  const decayed  = applyDecay(raw, now);
   const newStage = computeStage(raw.xp, raw.created_at, raw.hatched);
 
   if (Object.keys(decayed).length > 0 || newStage !== raw.stage) {
-    updateWorm.run({
-      ...raw,
-      ...decayed,
-      stage:         newStage,
-      owner_token:   raw.owner_token,
-    });
+    updateWorm.run({ ...raw, ...decayed, stage: newStage, owner_token: raw.owner_token });
   }
 
   const updated = getWormByToken.get(req.params.token) as WormRow;
   res.json(dbRowToWorm(updated));
 });
 
-// ── PATCH /api/worms/:token — sync state from PWA ────────────────────────
+// ── PATCH /api/worms/:token — sync state from PWA ─────────────────────────
 
 app.patch('/api/worms/:token', (req: Request, res: Response) => {
   const raw = getWormByToken.get(req.params.token) as WormRow | undefined;
@@ -332,29 +622,29 @@ app.patch('/api/worms/:token', (req: Request, res: Response) => {
   );
 
   updateWorm.run({
-    owner_token:   raw.owner_token,
-    name:          raw.name,
-    hat:           body.hat            ?? raw.hat,
-    shades:        body.shades         ?? raw.shades,
-    stage:         newStage,
-    hatched:       body.hatched !== undefined ? (body.hatched ? 1 : 0) : raw.hatched,
-    mood:          body.mood           ?? raw.mood,
-    hunger:        body.hunger         ?? raw.hunger,
-    is_sick:       body.isSick !== undefined ? (body.isSick ? 1 : 0) : raw.is_sick,
-    xp:            body.xp             ?? raw.xp,
-    feed_count:    body.feedCount      ?? raw.feed_count,
-    game_count:    body.gameCount      ?? raw.game_count,
-    login_streak:  body.loginStreak    ?? raw.login_streak,
-    last_login_day:body.lastLoginDay   ?? raw.last_login_day,
-    low_mood_since:body.lowMoodSince   !== undefined ? body.lowMoodSince : raw.low_mood_since,
-    last_checked:  body.lastChecked    ?? now,
+    owner_token:    raw.owner_token,
+    name:           raw.name,
+    hat:            body.hat            ?? raw.hat,
+    shades:         body.shades         ?? raw.shades,
+    stage:          newStage,
+    hatched:        body.hatched !== undefined ? (body.hatched ? 1 : 0) : raw.hatched,
+    mood:           body.mood           ?? raw.mood,
+    hunger:         body.hunger         ?? raw.hunger,
+    is_sick:        body.isSick !== undefined ? (body.isSick ? 1 : 0) : raw.is_sick,
+    xp:             body.xp             ?? raw.xp,
+    feed_count:     body.feedCount      ?? raw.feed_count,
+    game_count:     body.gameCount      ?? raw.game_count,
+    login_streak:   body.loginStreak    ?? raw.login_streak,
+    last_login_day: body.lastLoginDay   ?? raw.last_login_day,
+    low_mood_since: body.lowMoodSince   !== undefined ? body.lowMoodSince : raw.low_mood_since,
+    last_checked:   body.lastChecked    ?? now,
   });
 
   const updated = getWormByToken.get(req.params.token) as WormRow;
   res.json(dbRowToWorm(updated));
 });
 
-// ── GET /api/worms/:token/qr — regenerate QR PNG ─────────────────────────
+// ── GET /api/worms/:token/qr ──────────────────────────────────────────────
 
 app.get('/api/worms/:token/qr', async (req: Request, res: Response) => {
   const raw = getWormByToken.get(req.params.token) as WormRow | undefined;
@@ -362,8 +652,7 @@ app.get('/api/worms/:token/qr', async (req: Request, res: Response) => {
 
   const careUrl = `${CARE_URL}/care?token=${raw.owner_token}`;
   const png     = await QRCode.toBuffer(careUrl, {
-    type: 'png',
-    width: 300,
+    type: 'png', width: 300,
     color: { dark: '#00f5ff', light: '#0a0020' },
   });
   res.setHeader('Content-Type', 'image/png');
@@ -384,7 +673,7 @@ app.post('/api/friends/:token', (req: Request, res: Response) => {
   const { friendToken } = req.body as { friendToken?: string };
   const myToken         = req.params.token;
 
-  if (!friendToken)         { res.status(400).json({ error: 'friendToken required' }); return; }
+  if (!friendToken)            { res.status(400).json({ error: 'friendToken required' }); return; }
   if (friendToken === myToken) { res.status(400).json({ error: 'cannot friend yourself' }); return; }
 
   const friendExists = getWormByToken.get(friendToken);
@@ -394,12 +683,9 @@ app.post('/api/friends/:token', (req: Request, res: Response) => {
   if (!myWorm) { res.status(404).json({ error: 'your worm not found' }); return; }
 
   const now = Date.now();
+  upsertFriend.run({ worm_token: myToken,      friend_token: friendToken, now });
+  upsertFriend.run({ worm_token: friendToken,  friend_token: myToken,     now });
 
-  // Upsert both sides
-  upsertFriend.run({ worm_token: myToken,     friend_token: friendToken, now });
-  upsertFriend.run({ worm_token: friendToken, friend_token: myToken,     now });
-
-  // Mood boost for both worms
   db.prepare(`UPDATE worms SET mood = MIN(100, mood + 10), xp = xp + 5 WHERE owner_token = ?`).run(myToken);
   db.prepare(`UPDATE worms SET mood = MIN(100, mood + 10), xp = xp + 5 WHERE owner_token = ?`).run(friendToken);
 
@@ -415,8 +701,10 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
 
 // ── Start ─────────────────────────────────────────────────────────────────
 
-app.listen(PORT, () => {
-  console.log(`🪱 Worm API running on http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🪱 Worm API running on http://0.0.0.0:${PORT}`);
+  console.log(`   Landing page: http://localhost:${PORT}/`);
+  console.log(`   Admin panel:  http://localhost:${PORT}/admin`);
   console.log(`   Care PWA URL: ${CARE_URL}`);
   console.log(`   DB: ${DB_PATH}`);
 });
