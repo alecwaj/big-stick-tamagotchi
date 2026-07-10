@@ -31,7 +31,10 @@ import path from 'path';
 const PORT      = parseInt(process.env.PORT ?? '3001', 10);
 const CARE_URL  = process.env.CARE_URL  ?? `http://localhost:5174`;
 const STUDIO_URL = process.env.STUDIO_URL ?? `http://localhost:5173`;
-const DB_PATH   = process.env.DB_PATH   ?? path.join(process.cwd(), 'worms.db');
+const DB_PATH   = process.env.DB_PATH  ??
+  (process.env.RAILWAY_VOLUME_MOUNT_PATH
+    ? path.join(process.env.RAILWAY_VOLUME_MOUNT_PATH, 'worms.db')
+    : path.join(process.cwd(), 'worms.db'));
 
 // ── Database setup ─────────────────────────────────────────────────────────
 
@@ -246,7 +249,11 @@ const getFriends = db.prepare<[string]>(
 // ── App ────────────────────────────────────────────────────────────────────
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
 app.use(express.json());
 
 // ── GET / — landing page ──────────────────────────────────────────────────
