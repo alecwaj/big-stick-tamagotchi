@@ -65,19 +65,19 @@ function Nebula() {
       <div style={{
         position: 'absolute', width: 600, height: 600,
         borderRadius: '50%', top: '-10%', left: '-5%',
-        background: 'radial-gradient(circle, rgba(120,0,255,0.12) 0%, transparent 70%)',
+        background: 'radial-gradient(circle, rgba(120,0,255,0.22) 0%, transparent 70%)',
         animation: 'nebulaShift 12s ease-in-out infinite',
       }} />
       <div style={{
         position: 'absolute', width: 500, height: 500,
         borderRadius: '50%', bottom: '5%', right: '-8%',
-        background: 'radial-gradient(circle, rgba(0,180,255,0.10) 0%, transparent 70%)',
+        background: 'radial-gradient(circle, rgba(0,180,255,0.20) 0%, transparent 70%)',
         animation: 'nebulaShift 16s ease-in-out infinite reverse',
       }} />
       <div style={{
         position: 'absolute', width: 400, height: 400,
         borderRadius: '50%', top: '40%', left: '55%',
-        background: 'radial-gradient(circle, rgba(255,0,150,0.07) 0%, transparent 70%)',
+        background: 'radial-gradient(circle, rgba(255,0,150,0.15) 0%, transparent 70%)',
         animation: 'nebulaShift 20s ease-in-out infinite',
       }} />
     </div>
@@ -91,7 +91,7 @@ export default function App() {
       className="scanlines"
       style={{
         minHeight: '100vh',
-        background: 'linear-gradient(160deg, #06000f 0%, #0a0020 50%, #060010 100%)',
+        background: 'linear-gradient(160deg, #0d0030 0%, #150040 50%, #0a001f 100%)',
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
         color: '#e0e0ff',
         position: 'relative',
@@ -105,8 +105,8 @@ export default function App() {
         <header
           style={{
             padding: '20px 40px',
-            borderBottom: '1px solid rgba(0,245,255,0.2)',
-            boxShadow: '0 1px 20px rgba(0,245,255,0.08)',
+            borderBottom: '1px solid rgba(0,245,255,0.45)',
+            boxShadow: '0 1px 20px rgba(0,245,255,0.18)',
             display: 'flex',
             alignItems: 'center',
             gap: 16,
@@ -118,12 +118,15 @@ export default function App() {
           <div>
             <h1
               className="pixel"
-              style={{ margin: 0, fontSize: 11, color: '#00f5ff', textShadow: '0 0 10px #00f5ff, 0 0 20px rgba(0,245,255,0.5)', letterSpacing: '0.04em' }}
+              style={{ margin: 0, fontSize: 14, color: '#00f5ff', textShadow: '0 0 10px #00f5ff, 0 0 20px rgba(0,245,255,0.5)', letterSpacing: '0.04em' }}
             >
-              Acceptance Studio
+              Airvana Studio
             </h1>
-            <p style={{ margin: '6px 0 0 0', fontSize: 11, color: 'rgba(150,150,200,0.6)' }}>
-              choose your worm · open the portal · join the hive
+            <p style={{ margin: '5px 0 0 0', fontSize: 12, color: 'rgba(200,200,255,0.85)' }}>
+              Find your forever worm for those pesky thoughts
+            </p>
+            <p style={{ margin: '3px 0 0 0', fontSize: 10, color: 'rgba(150,150,200,0.55)', fontStyle: 'italic' }}>
+              The worm chooses you · the worm chooses you · the worm chooses you
             </p>
           </div>
         </header>

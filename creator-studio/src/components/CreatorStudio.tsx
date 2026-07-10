@@ -64,7 +64,7 @@ const TRAITS: { value: WormTrait; label: string; emoji: string }[] = [
 
 // ── Helpers ───────────────────────────────────────────────────────
 
-const PWA_BASE = import.meta.env.VITE_PWA_URL ?? API_BASE.replace(':3001', ':5174');
+const PWA_BASE = import.meta.env.VITE_PWA_URL ?? 'https://airvana-care.vercel.app';
 function buildCareUrl(token: string): string {
   return `${PWA_BASE}/care?token=${token}`;
 }
@@ -222,7 +222,7 @@ function SuccessScreen({ worm, onReset }: { worm: CreatedWorm; onReset: () => vo
         {worm.config.name} is entering your mind
       </h2>
       <p style={{ color: MUTED, margin: '0 0 32px 0', fontSize: 12 }}>
-        Scan the QR with your phone. Tap to begin acceptance.
+          Scan the QR with your phone. The worm is waiting.
       </p>
 
       <div style={{ display: 'flex', gap: 56, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -286,7 +286,7 @@ function SuccessScreen({ worm, onReset }: { worm: CreatedWorm; onReset: () => vo
           letterSpacing: '0.02em',
         }}
       >
-        ← ← accept another
+        ← invite another
       </button>
     </div>
   );
@@ -463,7 +463,7 @@ export function CreatorStudio() {
           onClick={handleHatch}
           disabled={loading}
         >
-          {loading ? 'accepting...' : '🪱 accept the worm'}
+          {loading ? 'opening the door...' : '🪱 invite the worm in'}
         </button>
       </div>
     </div>

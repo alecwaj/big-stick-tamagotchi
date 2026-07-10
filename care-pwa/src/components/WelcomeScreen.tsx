@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
-const PWA_BASE = import.meta.env.VITE_PWA_URL ?? API_BASE.replace(':3001', ':5174');
+const PWA_BASE = import.meta.env.VITE_PWA_URL ?? window.location.origin;
 
 export function WelcomeScreen() {
   const [name, setName]       = useState('');
