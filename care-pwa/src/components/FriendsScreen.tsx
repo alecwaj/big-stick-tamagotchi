@@ -3,7 +3,6 @@ import jsQR from 'jsqr';
 import { QRCodeSVG } from 'qrcode.react';
 import type { WormFriend, AddFriendResult } from '../types';
 
-const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
 const PWA_BASE = import.meta.env.VITE_PWA_URL ?? window.location.origin;
 
 interface FriendsScreenProps {
