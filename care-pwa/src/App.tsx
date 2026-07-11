@@ -7,25 +7,27 @@ import { WiggleRace } from './components/games/WiggleRace';
 import { BugCatch } from './components/games/BugCatch';
 import { MemoryMunch } from './components/games/MemoryMunch';
 import { FriendsScreen } from './components/FriendsScreen';
+import { OnboardingModal, shouldShowOnboarding } from './components/OnboardingModal';
 import type { GameId, GameResult } from './components/games/gameTypes';
 
 type Screen = 'care' | 'game-menu' | 'friends' | GameId;
 
-function getToken(): string | null {
+function getToken(): { token: string | null; wasQRScan: boolean } {
   const params = new URLSearchParams(window.location.search);
   const urlToken = params.get('token');
   if (urlToken) {
     localStorage.setItem('worm_token', urlToken);
     window.history.replaceState({}, '', window.location.pathname + window.location.hash);
-    return urlToken;
+    return { token: urlToken, wasQRScan: true };
   }
-  return localStorage.getItem('worm_token');
+  return { token: localStorage.getItem('worm_token'), wasQRScan: false };
 }
 
 export default function App() {
-  const token = useMemo(() => getToken(), []);
+  const { token, wasQRScan } = useMemo(() => getToken(), []);
   const { worm, loading, hatch, feed, cuddle, completeGame, heal, addFriend } = useWorm(token);
   const [screen, setScreen] = useState<Screen>('care');
+  const [showOnboarding, setShowOnboarding] = useState(() => shouldShowOnboarding(wasQRScan));
 
   // Loading state — show spinner while fetching from API
   if (loading && !worm) {
@@ -81,6 +83,13 @@ export default function App() {
         onHeal={heal}
         onHatch={hatch}
       />
+
+      {showOnboarding && (
+        <OnboardingModal
+          wormName={worm.name}
+          onDone={() => setShowOnboarding(false)}
+        />
+      )}
 
       {screen === 'game-menu' && (
         <GameMenu onSelect={(id) => setScreen(id)} onClose={() => setScreen('care')} />
