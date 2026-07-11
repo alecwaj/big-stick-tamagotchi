@@ -371,5 +371,36 @@ export function useWorm(token: string | null) {
     return result;
   }, [worm]);
 
-  return { worm, loading, hatch, feed, cuddle, completeGame, heal, addFriend };
+  const transmit = useCallback(async (toToken: string): Promise<{ fragment: string; label: string } | null> => {
+    if (!worm) return null;
+    try {
+      const resp = await fetch(`${API_BASE}/api/transmit/${worm.token}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ toToken }),
+      });
+      if (!resp.ok) return null;
+      const data = await resp.json() as { fragment: string; label: string };
+      setWorm((prev) => prev ? { ...prev, xp: prev.xp + 10, mood: clamp(prev.mood + 5) } : prev);
+      return data;
+    } catch { return null; }
+  }, [worm]);
+
+  const absorb = useCallback(async (txId: string): Promise<import('../types').AbsorbResult | null> => {
+    if (!worm) return null;
+    try {
+      const resp = await fetch(`${API_BASE}/api/transmit/${worm.token}/absorb/${txId}`, { method: 'POST' });
+      if (!resp.ok) return null;
+      const result = await resp.json() as import('../types').AbsorbResult;
+      // Refresh worm state from server to get updated genome/trait
+      const wResp = await fetch(`${API_BASE}/api/worms/${worm.token}`);
+      if (wResp.ok) {
+        const updated = await wResp.json() as import('../types').WormState;
+        setWorm(updated);
+      }
+      return result;
+    } catch { return null; }
+  }, [worm]);
+
+  return { worm, loading, hatch, feed, cuddle, completeGame, heal, addFriend, transmit, absorb };
 }

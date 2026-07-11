@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useWorm } from './hooks/useWorm';
 import { CareScreen } from './components/CareScreen';
 import { WelcomeScreen } from './components/WelcomeScreen';
@@ -7,10 +7,13 @@ import { WiggleRace } from './components/games/WiggleRace';
 import { BugCatch } from './components/games/BugCatch';
 import { MemoryMunch } from './components/games/MemoryMunch';
 import { FriendsScreen } from './components/FriendsScreen';
+import { TransmitScreen } from './components/TransmitScreen';
 import { OnboardingModal, shouldShowOnboarding } from './components/OnboardingModal';
 import type { GameId, GameResult } from './components/games/gameTypes';
 
-type Screen = 'care' | 'game-menu' | 'friends' | GameId;
+const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
+
+type Screen = 'care' | 'game-menu' | 'friends' | 'transmit' | GameId;
 
 function getToken(): { token: string | null; wasQRScan: boolean } {
   const params = new URLSearchParams(window.location.search);
@@ -25,9 +28,24 @@ function getToken(): { token: string | null; wasQRScan: boolean } {
 
 export default function App() {
   const { token, wasQRScan } = useMemo(() => getToken(), []);
-  const { worm, loading, hatch, feed, cuddle, completeGame, heal, addFriend } = useWorm(token);
+  const { worm, loading, hatch, feed, cuddle, completeGame, heal, addFriend, transmit, absorb } = useWorm(token);
   const [screen, setScreen] = useState<Screen>('care');
   const [showOnboarding, setShowOnboarding] = useState(() => shouldShowOnboarding(wasQRScan));
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Poll unread count every 30s
+  useEffect(() => {
+    if (!token) return;
+    const check = async () => {
+      try {
+        const r = await fetch(`${API_BASE}/api/transmit/${token}/unread`);
+        if (r.ok) { const d = await r.json(); setUnreadCount(d.unread ?? 0); }
+      } catch { /* offline */ }
+    };
+    check();
+    const id = setInterval(check, 30_000);
+    return () => clearInterval(id);
+  }, [token]);
 
   // Loading state — show spinner while fetching from API
   if (loading && !worm) {
@@ -80,6 +98,8 @@ export default function App() {
         onCuddle={cuddle}
         onOpenGames={() => setScreen('game-menu')}
         onOpenFriends={() => setScreen('friends')}
+        onOpenTransmit={() => setScreen('transmit')}
+        unreadTransmissions={unreadCount}
         onHeal={heal}
         onHatch={hatch}
       />
@@ -88,6 +108,20 @@ export default function App() {
         <OnboardingModal
           wormName={worm.name}
           onDone={() => setShowOnboarding(false)}
+        />
+      )}
+
+      {screen === 'transmit' && worm && (
+        <TransmitScreen
+          myToken={worm.token}
+          myName={worm.name}
+          myColor={worm.color}
+          myGenome={worm.genome}
+          myStage={worm.stage}
+          friends={worm.friends}
+          onTransmit={transmit!}
+          onAbsorb={absorb!}
+          onClose={() => { setScreen('care'); setUnreadCount(0); }}
         />
       )}
 

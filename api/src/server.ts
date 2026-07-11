@@ -83,6 +83,22 @@ db.exec(`
     FOREIGN KEY(worm_token) REFERENCES worms(owner_token)
   );
 
+  CREATE TABLE IF NOT EXISTS transmissions (
+    id              TEXT PRIMARY KEY,
+    from_token      TEXT NOT NULL,
+    to_token        TEXT NOT NULL,
+    fragment        TEXT NOT NULL,
+    sent_at         INTEGER NOT NULL,
+    read_at         INTEGER,
+    mutation_key    TEXT,
+    mutation_applied INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY(from_token) REFERENCES worms(owner_token),
+    FOREIGN KEY(to_token)   REFERENCES worms(owner_token)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_tx_to   ON transmissions(to_token, read_at);
+  CREATE INDEX IF NOT EXISTS idx_tx_from ON transmissions(from_token);
+
   CREATE INDEX IF NOT EXISTS idx_worms_token ON worms(owner_token);
   CREATE INDEX IF NOT EXISTS idx_friends_token ON friends(worm_token);
 `);
@@ -705,6 +721,216 @@ app.post('/api/friends/:token', (req: Request, res: Response) => {
 });
 
 // ── Error handler ─────────────────────────────────────────────────────────
+
+// ── Mutation engine ────────────────────────────────────────────────────────
+// A "thought fragment" carries a mutation key that flips one genome byte
+// or shifts the worm's trait when the receiver opens the transmission.
+
+const TRAITS = ['sleepy', 'hyper', 'grumpy', 'chill', 'bubbly', 'spooky'] as const;
+
+// 20 curated fragments — each maps to a mutation_key
+const FRAGMENTS: Array<{ text: string; mutationKey: string; label: string }> = [
+  { text: 'a memory that doesn\'t belong to you',        mutationKey: 'eye_shift',      label: 'Eye Shift' },
+  { text: 'the feeling of falling upward',               mutationKey: 'body_morph',     label: 'Body Morph' },
+  { text: 'something that hums in the dark',             mutationKey: 'glow_surge',     label: 'Glow Surge' },
+  { text: 'a thought about teeth',                       mutationKey: 'mouth_warp',     label: 'Mouth Warp' },
+  { text: 'the color of a sound you heard once',         mutationKey: 'marking_bloom',  label: 'Marking Bloom' },
+  { text: 'an itch behind the eyes',                     mutationKey: 'pupil_split',    label: 'Pupil Split' },
+  { text: 'a name you almost remember',                  mutationKey: 'tail_mutation',  label: 'Tail Mutation' },
+  { text: 'the urge to become something softer',         mutationKey: 'nub_growth',     label: 'Nub Growth' },
+  { text: 'static where silence should be',              mutationKey: 'trait_echo',     label: 'Trait Echo' },
+  { text: 'the exact weight of a secret',                mutationKey: 'body_morph',     label: 'Body Morph' },
+  { text: 'light from a source you can\'t locate',       mutationKey: 'glow_surge',     label: 'Glow Surge' },
+  { text: 'a dream that isn\'t finished',                 mutationKey: 'eye_shift',      label: 'Eye Shift' },
+  { text: 'the sound of your own name said wrong',       mutationKey: 'mouth_warp',     label: 'Mouth Warp' },
+  { text: 'warmth from a direction that doesn\'t exist', mutationKey: 'marking_bloom',  label: 'Marking Bloom' },
+  { text: 'a feeling of being very slightly translated', mutationKey: 'trait_echo',     label: 'Trait Echo' },
+  { text: 'the memory of a colour you\'ve never seen',   mutationKey: 'pupil_split',    label: 'Pupil Split' },
+  { text: 'the part of you that watches you sleep',      mutationKey: 'tail_mutation',  label: 'Tail Mutation' },
+  { text: 'an urgency with no object',                   mutationKey: 'nub_growth',     label: 'Nub Growth' },
+  { text: 'the version of yourself you almost became',   mutationKey: 'body_morph',     label: 'Body Morph' },
+  { text: 'something that has been waiting',             mutationKey: 'glow_surge',     label: 'Glow Surge' },
+];
+
+function pickFragment(): typeof FRAGMENTS[number] {
+  return FRAGMENTS[Math.floor(Math.random() * FRAGMENTS.length)];
+}
+
+// Genome byte indices per mutation key
+const MUTATION_GENOME_BYTE: Record<string, number> = {
+  body_morph:    1,
+  eye_shift:     2,
+  tail_mutation: 3,
+  marking_bloom: 4,
+  nub_growth:    6,
+  mouth_warp:    8,
+  glow_surge:    9,
+  pupil_split:   11,
+  trait_echo:    -1, // special: shifts the trait field
+};
+
+function applyMutation(worm: WormRow, mutationKey: string): { genome: string; trait: string } {
+  let genome = (worm.genome || '').padEnd(32, '0');
+  let trait  = worm.trait;
+
+  const byteIdx = MUTATION_GENOME_BYTE[mutationKey] ?? 0;
+
+  if (mutationKey === 'trait_echo') {
+    // Shift trait one step around the ring
+    const idx = (TRAITS.indexOf(trait as typeof TRAITS[number]) + 1) % TRAITS.length;
+    trait = TRAITS[idx];
+  } else {
+    // Flip 1–3 bits in the target genome byte (XOR with random nibble)
+    const pos  = byteIdx * 2;
+    const cur  = parseInt(genome.slice(pos, pos + 2) || '00', 16);
+    const flip = (Math.floor(Math.random() * 14) + 1); // 1–14
+    const next = (cur ^ flip) & 0xff;
+    const hex  = next.toString(16).padStart(2, '0');
+    genome = genome.slice(0, pos) + hex + genome.slice(pos + 2);
+  }
+
+  return { genome, trait };
+}
+
+// ── Prepared statements for transmissions ─────────────────────────────────
+
+const insertTx = db.prepare(`
+  INSERT INTO transmissions (id, from_token, to_token, fragment, sent_at, mutation_key, mutation_applied)
+  VALUES (@id, @from_token, @to_token, @fragment, @sent_at, @mutation_key, 0)
+`);
+
+const getInbox = db.prepare<[string]>(`
+  SELECT t.id, t.from_token, t.fragment, t.sent_at, t.read_at,
+         t.mutation_key, t.mutation_applied,
+         w.name AS from_name, w.color AS from_color
+  FROM   transmissions t
+  JOIN   worms w ON w.owner_token = t.from_token
+  WHERE  t.to_token = ?
+  ORDER  BY t.sent_at DESC
+  LIMIT  30
+`);
+
+const getUnreadCount = db.prepare<[string]>(
+  `SELECT COUNT(*) AS n FROM transmissions WHERE to_token = ? AND read_at IS NULL`
+);
+
+const markRead = db.prepare<[number, string]>(
+  `UPDATE transmissions SET read_at = ? WHERE id = ? AND read_at IS NULL`
+);
+
+const getTx = db.prepare<[string]>(
+  `SELECT * FROM transmissions WHERE id = ?`
+);
+
+const sentToday = db.prepare<[string, string, number]>(
+  `SELECT COUNT(*) AS n FROM transmissions WHERE from_token = ? AND to_token = ? AND sent_at > ?`
+);
+
+// ── POST /api/transmit/:token — send thought fragment ────────────────────
+
+app.post('/api/transmit/:token', (req: Request, res: Response) => {
+  const myToken     = req.params.token;
+  const { toToken } = req.body as { toToken?: string };
+
+  if (!toToken)           { res.status(400).json({ error: 'toToken required' }); return; }
+  if (toToken === myToken){ res.status(400).json({ error: 'cannot transmit to yourself' }); return; }
+
+  const sender   = getWormByToken.get(myToken);
+  const receiver = getWormByToken.get(toToken);
+  if (!sender)   { res.status(404).json({ error: 'your worm not found' }); return; }
+  if (!receiver) { res.status(404).json({ error: 'target worm not found' }); return; }
+
+  // Rate limit: max 3 transmissions per sender→receiver pair per 24h
+  const cutoff  = Date.now() - 24 * 60 * 60 * 1000;
+  const { n }   = sentToday.get(myToken, toToken, cutoff) as { n: number };
+  if (n >= 3)   { res.status(429).json({ error: 'transmission limit reached (3/day per worm)' }); return; }
+
+  const frag = pickFragment();
+  const id   = crypto.randomUUID();
+  const now  = Date.now();
+
+  insertTx.run({
+    id,
+    from_token:   myToken,
+    to_token:     toToken,
+    fragment:     frag.text,
+    sent_at:      now,
+    mutation_key: frag.mutationKey,
+  });
+
+  // Sender reward: small XP for transmitting
+  db.prepare(`UPDATE worms SET xp = xp + 10, mood = MIN(100, mood + 5) WHERE owner_token = ?`).run(myToken);
+
+  res.json({ id, fragment: frag.text, mutationKey: frag.mutationKey, label: frag.label });
+});
+
+// ── GET /api/transmit/:token/inbox — get inbox ────────────────────────────
+
+app.get('/api/transmit/:token/inbox', (req: Request, res: Response) => {
+  const worm = getWormByToken.get(req.params.token);
+  if (!worm) { res.status(404).json({ error: 'worm not found' }); return; }
+
+  const rows = getInbox.all(req.params.token);
+  const unread = (getUnreadCount.get(req.params.token) as { n: number }).n;
+
+  res.json({ transmissions: rows, unread });
+});
+
+// ── POST /api/transmit/:token/absorb/:txId — absorb + mutate ─────────────
+
+app.post('/api/transmit/:token/absorb/:txId', (req: Request, res: Response) => {
+  const { token, txId } = req.params;
+
+  const tx = getTx.get(txId) as {
+    id: string; from_token: string; to_token: string;
+    fragment: string; mutation_key: string; mutation_applied: number;
+  } | undefined;
+
+  if (!tx)                { res.status(404).json({ error: 'transmission not found' }); return; }
+  if (tx.to_token !== token) { res.status(403).json({ error: 'not your transmission' }); return; }
+  if (tx.mutation_applied){ res.status(409).json({ error: 'already absorbed' }); return; }
+
+  const worm = getWormByToken.get(token) as WormRow | undefined;
+  if (!worm) { res.status(404).json({ error: 'worm not found' }); return; }
+
+  const now = Date.now();
+  markRead.run(now, txId);
+
+  const { genome, trait } = applyMutation(worm, tx.mutation_key);
+
+  // XP reward for absorbing
+  const xpGain = 30;
+
+  db.prepare(`
+    UPDATE worms
+    SET genome = @genome, trait = @trait,
+        xp = xp + @xp, mood = MIN(100, mood + 15)
+    WHERE owner_token = @token
+  `).run({ genome, trait, xp: xpGain, token });
+
+  db.prepare(`UPDATE transmissions SET mutation_applied = 1 WHERE id = ?`).run(txId);
+
+  // Find the mutation label
+  const mutDef = FRAGMENTS.find(f => f.mutationKey === tx.mutation_key);
+
+  res.json({
+    mutationKey:   tx.mutation_key,
+    mutationLabel: mutDef?.label ?? tx.mutation_key,
+    traitChanged:  trait !== worm.trait,
+    newTrait:      trait,
+    genomeChanged: genome !== worm.genome,
+    xpGained:      xpGain,
+  });
+});
+
+// ── GET /api/transmit/:token/unread — unread badge count ─────────────────
+
+app.get('/api/transmit/:token/unread', (req: Request, res: Response) => {
+  const worm = getWormByToken.get(req.params.token);
+  if (!worm) { res.status(404).json({ error: 'worm not found' }); return; }
+  const { n } = getUnreadCount.get(req.params.token) as { n: number };
+  res.json({ unread: n });
+});
 
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   console.error(err);

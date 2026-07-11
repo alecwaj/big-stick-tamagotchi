@@ -31,6 +31,29 @@ export interface WormFriend {
 
 export type AddFriendResult = 'added' | 'reunited' | 'self' | 'invalid';
 
+// ── Transmissions ──────────────────────────────────────────────────────────
+
+export interface Transmission {
+  id: string;
+  from_token: string;
+  from_name: string;
+  from_color: WormColor;
+  fragment: string;
+  sent_at: number;
+  read_at: number | null;
+  mutation_key: string;
+  mutation_applied: number; // 0 | 1
+}
+
+export interface AbsorbResult {
+  mutationKey: string;
+  mutationLabel: string;
+  traitChanged: boolean;
+  newTrait: WormTrait;
+  genomeChanged: boolean;
+  xpGained: number;
+}
+
 export interface WormState {
   id: string;
   token: string;

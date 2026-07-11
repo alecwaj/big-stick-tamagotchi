@@ -10,6 +10,8 @@ interface CareScreenProps {
   onCuddle: () => void;
   onOpenGames: () => void;
   onOpenFriends: () => void;
+  onOpenTransmit: () => void;
+  unreadTransmissions: number;
   onHeal: () => void;
   onHatch: () => void;
 }
@@ -385,7 +387,7 @@ function deriveExpression(worm: WormState): WormExpression {
   return 'neutral';
 }
 
-export function CareScreen({ worm, onFeed, onCuddle, onOpenGames, onOpenFriends, onHeal, onHatch }: CareScreenProps) {
+export function CareScreen({ worm, onFeed, onCuddle, onOpenGames, onOpenFriends, onOpenTransmit, unreadTransmissions, onHeal, onHatch }: CareScreenProps) {
   const color = COLOR_MAP[worm.color];
   const glow  = GLOW_MAP[worm.color];
   const expr  = deriveExpression(worm);
@@ -568,6 +570,16 @@ export function CareScreen({ worm, onFeed, onCuddle, onOpenGames, onOpenFriends,
               borderRadius: 3, color: '#ff00cc', padding: '4px 8px', cursor: 'pointer', lineHeight: 1.4,
             }}>
               🪱 {worm.friends.length}
+            </button>
+            <button onClick={onOpenTransmit} style={{
+              fontFamily: "'Press Start 2P', monospace", fontSize: 6,
+              background: unreadTransmissions > 0 ? 'rgba(255,0,85,0.15)' : 'rgba(0,245,255,0.08)',
+              border: `1px solid ${unreadTransmissions > 0 ? 'rgba(255,0,85,0.5)' : 'rgba(0,245,255,0.3)'}`,
+              borderRadius: 3,
+              color: unreadTransmissions > 0 ? '#ff0055' : 'rgba(0,245,255,0.7)',
+              padding: '4px 8px', cursor: 'pointer', lineHeight: 1.4, position: 'relative',
+            }}>
+              📡{unreadTransmissions > 0 ? ` ${unreadTransmissions}` : ''}
             </button>
           </div>
         </div>
