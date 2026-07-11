@@ -1,7 +1,107 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import jsQR from 'jsqr';
 import { WormSVG } from './WormSVG';
-import type { WormFriend, Transmission, AbsorbResult, WormColor } from '../types';
+import type { Transmission, AbsorbResult, WormColor } from '../types';
 import { COLOR_MAP } from '../types';
+
+// ── Inline QR Scanner (camera + jsQR) ─────────────────────────────────────
+
+type ScanPhase = 'requesting' | 'scanning' | 'denied';
+
+function QRScannerInline({ onDetected }: { onDetected: (data: string) => void }) {
+  const videoRef  = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const rafRef    = useRef<number>(0);
+  const streamRef = useRef<MediaStream | null>(null);
+  const [phase, setPhase] = useState<ScanPhase>('requesting');
+
+  useEffect(() => {
+    let cancelled = false;
+    navigator.mediaDevices
+      .getUserMedia({ video: { facingMode: 'environment' }, audio: false })
+      .then((stream) => {
+        if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
+        streamRef.current = stream;
+        const video = videoRef.current!;
+        video.srcObject = stream;
+        video.play();
+        setPhase('scanning');
+
+        const tick = () => {
+          if (cancelled) return;
+          const canvas = canvasRef.current;
+          const ctx    = canvas?.getContext('2d');
+          if (!canvas || !ctx) { rafRef.current = requestAnimationFrame(tick); return; }
+          if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            canvas.width  = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0);
+            const img  = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+            if (code?.data) { onDetected(code.data); return; }
+          }
+          rafRef.current = requestAnimationFrame(tick);
+        };
+        rafRef.current = requestAnimationFrame(tick);
+      })
+      .catch(() => { if (!cancelled) setPhase('denied'); });
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(rafRef.current);
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+    };
+  }, [onDetected]);
+
+  if (phase === 'requesting') return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+      <div style={{ fontSize: 36 }}>📷</div>
+      <p style={{ margin: 0, fontSize: 11, color: '#00f5ff', fontFamily: "'Press Start 2P', monospace" }}>requesting camera...</p>
+    </div>
+  );
+
+  if (phase === 'denied') return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24, textAlign: 'center' }}>
+      <div style={{ fontSize: 36 }}>🚫</div>
+      <p style={{ margin: 0, fontSize: 12, color: '#ff0055' }}>camera access denied</p>
+      <p style={{ margin: 0, fontSize: 12, color: 'rgba(180,180,220,0.6)', lineHeight: 1.6 }}>
+        Allow camera access in your browser settings and try again.
+      </p>
+    </div>
+  );
+
+  return (
+    <div style={{ position: 'relative', flex: 1, overflow: 'hidden', background: '#000', minHeight: 280 }}>
+      <video ref={videoRef} playsInline muted
+        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+      <canvas ref={canvasRef} style={{ display: 'none' }} />
+
+      {/* Viewfinder */}
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+        <div style={{ width: 200, height: 200, border: '2px solid #00f5ff',
+          boxShadow: '0 0 0 2000px rgba(0,0,0,0.55), 0 0 20px rgba(0,245,255,0.5)',
+          borderRadius: 8, position: 'relative' }}>
+          {[
+            { top: -2, left: -2, borderTop: '3px solid #00f5ff', borderLeft: '3px solid #00f5ff', borderRadius: '6px 0 0 0' },
+            { top: -2, right: -2, borderTop: '3px solid #00f5ff', borderRight: '3px solid #00f5ff', borderRadius: '0 6px 0 0' },
+            { bottom: -2, left: -2, borderBottom: '3px solid #00f5ff', borderLeft: '3px solid #00f5ff', borderRadius: '0 0 0 6px' },
+            { bottom: -2, right: -2, borderBottom: '3px solid #00f5ff', borderRight: '3px solid #00f5ff', borderRadius: '0 0 6px 0' },
+          ].map((s, i) => <div key={i} style={{ position: 'absolute', width: 24, height: 24, ...s }} />)}
+          <div style={{ position: 'absolute', left: 0, right: 0, height: 2,
+            background: 'linear-gradient(90deg, transparent, #00f5ff, transparent)',
+            animation: 'txScanLine 2s ease-in-out infinite',
+            boxShadow: '0 0 8px #00f5ff' }} />
+        </div>
+      </div>
+      <div style={{ position: 'absolute', bottom: 16, left: 0, right: 0, textAlign: 'center' }}>
+        <span style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 7, color: 'rgba(0,245,255,0.8)', textShadow: '0 0 8px #00f5ff' }}>
+          scan their worm QR
+        </span>
+      </div>
+      <style>{`@keyframes txScanLine { 0%,100% { top:0; } 50% { top: calc(100% - 2px); } }`}</style>
+    </div>
+  );
+}
 
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
 
@@ -28,8 +128,6 @@ interface TransmitScreenProps {
   myName: string;
   myColor: WormColor;
   myGenome: string;
-  myStage: string;
-  friends: WormFriend[];
   onTransmit: (toToken: string) => Promise<{ fragment: string; label: string } | null>;
   onAbsorb: (txId: string) => Promise<AbsorbResult | null>;
   onClose: () => void;
@@ -139,8 +237,8 @@ function MutationReveal({ result, wormName, onDone }: {
 // ── Main screen ───────────────────────────────────────────────────────────
 
 export function TransmitScreen({
-  myToken, myName, myColor, myGenome,
-  friends, onTransmit, onAbsorb, onClose,
+  myToken, myName,
+  onTransmit, onAbsorb, onClose,
 }: TransmitScreenProps) {
   const [tab, setTab]             = useState<Tab>('inbox');
   const [inbox, setInbox]         = useState<Transmission[] | null>(null);
@@ -148,9 +246,9 @@ export function TransmitScreen({
   const [loading, setLoading]     = useState(false);
 
   // Send state
-  const [selectedFriend, setSelectedFriend] = useState<WormFriend | null>(null);
-  const [sendState, setSendState]   = useState<'idle' | 'sending' | 'sent' | 'error' | 'ratelimit'>('idle');
+  const [scanState, setScanState]   = useState<'scanning' | 'sending' | 'sent' | 'error' | 'ratelimit'>('scanning');
   const [sentFragment, setSentFragment] = useState('');
+  const [sentToName, setSentToName] = useState('');
 
   // Absorb state
   const [absorbingId, setAbsorbingId] = useState<string | null>(null);
@@ -173,19 +271,32 @@ export function TransmitScreen({
 
   useEffect(() => { fetchInbox(); }, [fetchInbox]);
 
-  // ── Send handler
-  const handleSend = async () => {
-    if (!selectedFriend) return;
-    setSendState('sending');
-    const result = await onTransmit(selectedFriend.token);
+  // ── Send handler — called when a QR is scanned
+  const handleScanned = async (qrData: string) => {
+    // Extract token from care URL: /care?token=<uuid>
+    let toToken: string | null = null;
+    try {
+      const url = new URL(qrData);
+      toToken = url.searchParams.get('token');
+    } catch {
+      // raw token
+      if (/^[0-9a-f-]{36}$/.test(qrData)) toToken = qrData;
+    }
+    if (!toToken || toToken === myToken) {
+      setScanState('error');
+      setTimeout(() => setScanState('scanning'), 2000);
+      return;
+    }
+    setScanState('sending');
+    const result = await onTransmit(toToken);
     if (!result) {
-      // Check if rate limited
-      setSendState('error');
-      setTimeout(() => setSendState('idle'), 2500);
+      setScanState('ratelimit');
+      setTimeout(() => setScanState('scanning'), 3000);
       return;
     }
     setSentFragment(result.fragment);
-    setSendState('sent');
+    setSentToName(toToken.slice(0, 6).toUpperCase());
+    setScanState('sent');
   };
 
   // ── Absorb handler
@@ -383,134 +494,86 @@ export function TransmitScreen({
 
       {/* ── SEND TAB ── */}
       {tab === 'send' && (
-        <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
 
-          {/* My worm */}
-          <div style={{
-            background: CARD_BG, border: `1px solid ${BORDER}`,
-            borderRadius: 12, padding: 16,
-            display: 'flex', alignItems: 'center', gap: 12,
-          }}>
-            <WormPortrait color={myColor} genome={myGenome} size={52} />
-            <div>
-              <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: COLOR_MAP[myColor] }}>{myName}</p>
-              <p style={{ margin: '3px 0 0', fontSize: 10, color: MUTED }}>transmitting from</p>
-            </div>
-          </div>
-
-          {/* Friend picker */}
-          <div>
-            <p style={{ margin: '0 0 10px', fontSize: 11, color: MUTED, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-              choose recipient
-            </p>
-            {friends.length === 0 ? (
-              <div style={{
-                background: CARD_BG, border: `1px solid ${BORDER}`,
-                borderRadius: 12, padding: '24px 16px', textAlign: 'center',
-              }}>
-                <p style={{ margin: 0, fontSize: 13, color: MUTED }}>no worm connections yet</p>
-                <p style={{ margin: '6px 0 0', fontSize: 11, color: 'rgba(150,150,200,0.35)' }}>
-                  scan a friend's QR in the connections tab first
-                </p>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {friends.map((f) => {
-                  const wf = f as WormFriend & { name?: string; color?: WormColor };
-                  const friendName  = wf.name  ?? f.token.slice(0, 8).toUpperCase();
-                  const friendColor = wf.color ?? 'blue';
-                  const selected    = selectedFriend?.token === f.token;
-
-                  return (
-                    <button
-                      key={f.token}
-                      onClick={() => { setSelectedFriend(f); setSendState('idle'); }}
-                      style={{
-                        background: selected ? 'rgba(0,245,255,0.08)' : CARD_BG,
-                        border: `1px solid ${selected ? 'rgba(0,245,255,0.5)' : BORDER}`,
-                        borderRadius: 10, padding: '12px 14px',
-                        display: 'flex', alignItems: 'center', gap: 12,
-                        cursor: 'pointer', textAlign: 'left',
-                        boxShadow: selected ? '0 0 10px rgba(0,245,255,0.08)' : 'none',
-                      }}
-                    >
-                      <WormPortrait color={friendColor} genome="" size={40} />
-                      <div style={{ flex: 1 }}>
-                        <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: COLOR_MAP[friendColor] }}>
-                          {friendName}
-                        </p>
-                        <p style={{ margin: '2px 0 0', fontSize: 10, color: MUTED }}>
-                          met {f.meetCount}×
-                        </p>
-                      </div>
-                      {selected && <span style={{ color: CYAN, fontSize: 16 }}>✓</span>}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Transmission lore */}
-          <div style={{
-            background: 'rgba(120,0,255,0.07)',
-            border: '1px solid rgba(120,0,255,0.25)',
-            borderRadius: 12, padding: '14px 16px',
-          }}>
-            <p style={{ margin: '0 0 6px', fontSize: 11, color: 'rgba(200,180,255,0.7)', letterSpacing: '0.05em' }}>
-              HOW IT WORKS
-            </p>
-            <p style={{ margin: 0, fontSize: 12, color: 'rgba(180,160,255,0.8)', lineHeight: 1.6 }}>
-              A random thought fragment is drawn from the hive and sent to their worm. 
-              When they absorb it, their worm mutates — a genome byte shifts, a trait evolves. 
-              You earn +10 XP for transmitting. They earn +30 XP for absorbing.
-            </p>
-          </div>
-
-          {/* Send button */}
-          {sendState === 'sent' ? (
+          {scanState === 'sent' ? (
+            /* Success state */
             <div style={{
-              background: 'rgba(0,245,255,0.06)',
-              border: '1px solid rgba(0,245,255,0.3)',
-              borderRadius: 12, padding: 20, textAlign: 'center',
+              flex: 1, display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center',
+              padding: 32, textAlign: 'center', gap: 16,
             }}>
-              <div style={{ fontSize: 32, marginBottom: 10 }}>📡</div>
-              <p style={{ margin: '0 0 6px', fontSize: 14, color: CYAN, fontWeight: 600 }}>transmitted</p>
-              <p style={{ margin: '0 0 16px', fontSize: 13, color: 'rgba(200,200,255,0.8)', fontStyle: 'italic', lineHeight: 1.5 }}>
+              <div style={{ fontSize: 52 }}>📡</div>
+              <p style={{ margin: 0, fontSize: 15, color: '#00f5ff', fontWeight: 700 }}>transmitted</p>
+              <p style={{
+                margin: 0, fontSize: 14, color: 'rgba(200,200,255,0.85)',
+                fontStyle: 'italic', lineHeight: 1.6,
+                borderLeft: '2px solid rgba(0,245,255,0.4)', paddingLeft: 12,
+                textAlign: 'left', maxWidth: 280,
+              }}>
                 "{sentFragment}"
               </p>
+              <p style={{ margin: 0, fontSize: 11, color: MUTED }}>+10 XP · fragment sent to #{sentToName}</p>
               <button
-                onClick={() => { setSendState('idle'); setSelectedFriend(null); }}
+                onClick={() => setScanState('scanning')}
                 style={{
+                  marginTop: 8, padding: '12px 28px',
                   background: 'none', border: `1px solid ${BORDER}`,
-                  borderRadius: 8, color: MUTED, fontSize: 12, cursor: 'pointer',
-                  padding: '8px 20px',
+                  borderRadius: 10, color: MUTED, fontSize: 13, cursor: 'pointer',
                 }}
               >
-                send another
+                scan another
               </button>
             </div>
+
+          ) : scanState === 'sending' ? (
+            /* Transmitting spinner */
+            <div style={{
+              flex: 1, display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center', gap: 16,
+            }}>
+              <div style={{ fontSize: 40, animation: 'pulse 1s ease-in-out infinite' }}>📡</div>
+              <p style={{ margin: 0, fontSize: 12, color: CYAN, fontFamily: "'Press Start 2P', monospace" }}>
+                transmitting...
+              </p>
+            </div>
+
+          ) : scanState === 'ratelimit' ? (
+            /* Rate limit warning */
+            <div style={{
+              flex: 1, display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center', gap: 16, padding: 32, textAlign: 'center',
+            }}>
+              <div style={{ fontSize: 40 }}>🚧</div>
+              <p style={{ margin: 0, fontSize: 13, color: '#ffaa00', fontWeight: 600 }}>transmission limit reached</p>
+              <p style={{ margin: 0, fontSize: 12, color: MUTED, lineHeight: 1.6 }}>
+                You've already sent 3 fragments to this worm today.{' '}
+                Find someone else to transmit to.
+              </p>
+            </div>
+
+          ) : scanState === 'error' ? (
+            /* Bad QR */
+            <div style={{
+              flex: 1, display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center', gap: 16,
+            }}>
+              <div style={{ fontSize: 40 }}>⚠️</div>
+              <p style={{ margin: 0, fontSize: 12, color: '#ff0055' }}>invalid worm QR</p>
+              <p style={{ margin: 0, fontSize: 11, color: MUTED }}>returning to scanner...</p>
+            </div>
+
           ) : (
-            <button
-              onClick={handleSend}
-              disabled={!selectedFriend || sendState === 'sending'}
-              style={{
-                padding: '16px 0',
-                background: selectedFriend && sendState !== 'sending'
-                  ? 'linear-gradient(90deg, #7b00ff, #00c8ff)'
-                  : 'rgba(255,255,255,0.05)',
-                border: 'none', borderRadius: 12,
-                color: selectedFriend ? '#fff' : MUTED,
-                fontSize: 15, fontWeight: 700, cursor: selectedFriend ? 'pointer' : 'default',
-                letterSpacing: '0.03em',
-                transition: 'all 0.2s',
-              }}
-            >
-              {sendState === 'sending' ? 'transmitting...' :
-               sendState === 'error'   ? '⚠ failed — try again' :
-               selectedFriend          ? '📡 transmit thought fragment' :
-               'select a worm to transmit to'}
-            </button>
+            /* Live scanner */
+            <>
+              <div style={{ padding: '12px 20px 8px' }}>
+                <p style={{ margin: 0, fontSize: 11, color: MUTED, lineHeight: 1.6 }}>
+                  Point your camera at another worm owner's QR code to transmit a thought fragment.
+                  You must be in the same place.
+                </p>
+              </div>
+              <QRScannerInline onDetected={handleScanned} />
+            </>
           )}
         </div>
       )}

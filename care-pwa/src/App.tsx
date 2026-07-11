@@ -117,8 +117,6 @@ export default function App() {
           myName={worm.name}
           myColor={worm.color}
           myGenome={worm.genome}
-          myStage={worm.stage}
-          friends={worm.friends}
           onTransmit={transmit!}
           onAbsorb={absorb!}
           onClose={() => { setScreen('care'); setUnreadCount(0); }}
