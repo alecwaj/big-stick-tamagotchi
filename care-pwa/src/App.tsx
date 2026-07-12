@@ -78,7 +78,8 @@ export default function App() {
       <div style={{ fontSize: 48 }}>🪱</div>
       <p>hive signal lost</p>
       <p style={{ color: 'rgba(150,150,200,0.5)', fontSize: 7, lineHeight: 2 }}>
-        make sure the acceptance studio is on{"\n"}and you&apos;re on the same wifi
+        make sure you have signal or wifi
+        and try refreshing the page
       </p>
     </div>
   );

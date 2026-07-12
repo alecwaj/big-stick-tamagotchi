@@ -103,7 +103,7 @@ export const GLOW_MAP: Record<WormColor, string> = {
 // Decay rates per millisecond
 export const MOOD_DECAY_PER_MS   = 5   / (60 * 60 * 1000);  // 5pt/hr
 export const HUNGER_DECAY_PER_MS = 8   / (60 * 60 * 1000);  // 8pt/hr
-export const SICK_THRESHOLD_MS   = 4 * 60 * 60 * 1000;       // 4 hours
+export const SICK_THRESHOLD_MS   = 12 * 60 * 60 * 1000;       // 12 hours — worms stay healthy all night
 
 // XP + age thresholds
 export const ADULT_XP_THRESHOLD  = 500;

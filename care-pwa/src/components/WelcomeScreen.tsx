@@ -20,7 +20,7 @@ export function WelcomeScreen() {
       // Navigate to the care URL with the token
       window.location.href = `${PWA_BASE}/care?token=${data.ownerToken}`;
     } catch {
-      setError('hive signal lost — are you on the right WiFi?');
+      setError('hive signal lost — check your connection');
       setLoading(false);
     }
   };
